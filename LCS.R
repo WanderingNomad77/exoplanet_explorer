@@ -11,8 +11,6 @@ tfe_enable_eager_execution()
 library(tfdatasets)
 library(caret)
 
-library(modules)
-
 
 options(scipen = 999)
 
@@ -48,35 +46,12 @@ tce_validation <- tce_training[-partition_training,]
 tce_validation <- tce_validation %>%
   array(dimnames = dimnames(tce_validation))
 
-
-# Labels
-
-tce_train_labels <- tce_training$av_training_set %>%
-  as.array()
-
-tce_training <- tce_training %>%
-  dplyr::select(-av_training_set)
-
-tce_test_labels <- tce_test$av_training_set %>%
-  as.array()
-
-tce_test <- tce_test %>%
-  dplyr::select(-av_training_set)
-
-tce_validation_labels <- tce_validation$av_training_set %>%
-  as.array()
-
-tce_validation <- tce_validation %>%
-  dplyr::select(-av_training_set)
-
-
 unique_kepid <- tce_training[!duplicated(tce_training$kepid),] %>%
   dplyr::select(kepid)
 
-
 # Kepler 90 Data
 
-base_directory <- "/mnt2/archive.stsci.edu/pub/kepler/lightcurves" 
+base_directory <- "/data/archive.stsci.edu/pub/kepler/lightcurves/0114/011442793/" 
 
 list_files <- function(directory, ID = "11442793") {
   
@@ -110,27 +85,5 @@ kepler90_df <- do.call(rbind, lapply(fits, as.data.frame))
 # Export df to csv
 
 savedf <-saveRDS(df, file = 'kepler90.RDS', row.names = F)
-
-# Spark Connection
-
-Sys.setenv("SPARK_HOME" = '/usr/lib/spark/')
-
-config <- spark_config()
-
-sc <- sparklyr::spark_connect(master = 'yarn-client', config = config)
-sc2 <- spark_read_table(sc, 'df2')
-
-## After creating tce hive table and loading the data into it, we need to cache the table into memory
-
-# Cache tce table into memory
-tbl_cache(sc, "tce")
-tce_tbl <- tbl(sc, "tce") 
-
-# 
-
-full_tbl <- copy_to(sc, full_light_curve, name = "blabla")
-
-tbl_cache(sc, "blabla")
-blabla_tbl <- tbl(sc, "blabla")
 
 

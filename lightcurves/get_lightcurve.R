@@ -6,7 +6,7 @@ library(ggthemes)
   
 # Function to retrieve target file names. 
 
-base_directory <- "/mnt2/archive.stsci.edu/pub/kepler/lightcurves" 
+base_directory <- "/data/archive.stsci.edu/pub/kepler/lightcurves" 
 
 
 list_files <- function(directory, ID = NULL) {
@@ -67,6 +67,8 @@ segment_curve <- function(segment) {
 full_light_curve <- do.call(rbind, lapply(read_fits, as.data.frame))%>%
   dplyr::select(TIME, PDCSAP_FLUX) %>%
   filter(!is.na(TIME), !is.na(PDCSAP_FLUX)) 
+
+print(smoothing(full_light_curve))
 
 
 

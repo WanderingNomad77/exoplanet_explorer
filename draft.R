@@ -185,3 +185,11 @@ time = tf$Variable(matrix(kep90$time, nrow = nrow(kep90)), dtype = tf$float32)
 flux = tf$Variable(matrix(kep90$flux, nrow = nrow(kep90)), dtype = tf$float32)
 
 t <- tf$concat(list(period, t0, duration, time, flux), 1L)
+
+
+
+
+
+
+
+read_curve <- apply(data.frame(unique_kepid$kepid[1]), 1, function(x) generate_view(x, directory = base_directory))
