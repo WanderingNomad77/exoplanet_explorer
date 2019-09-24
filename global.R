@@ -1,29 +1,51 @@
 library(tidyverse)
-source('aitoff.R')
+
 source('nightskytheme.R')
 library(astrolibR)
 library(sf)
 library(corrplot)
 library(ggmap)
+library(concaveman)
 
 # Import data
 
-planets <- read.csv('planets_2019.07.09_21.07.01.csv', stringsAsFactors = F, skip = 38, na.strings = c("NA", ""))
+planets <- read.csv('planets_2019.07.09_21.07.01.csv', stringsAsFactors = F, skip = 38, na.strings = c("NA", "")) %>%
+  select(loc_rowid, `Planet Hostname` = pl_hostname, pl_letter, `Planet Name` = pl_name, `Discovery Method` = pl_discmethod, pl_controvflag, pl_pnum,
+         `Orbital Period (days)` = pl_orbper, `Orbit Semi-Major Axis (AU)` = pl_orbsmax, Eccentricity = pl_orbeccen, `Inclination (deg)` = pl_orbincl, 
+         `Planet Mass or M*sin(i) [Jupiter mass]` = pl_bmassj, `Planet Radius (Jupiter radii)` = pl_radj, `Planet Density (g/cm**3)` = pl_dens,
+         `Planet Mass or M*sin(i) Provenance` = pl_bmassprov, `TTV Flag` = pl_ttvflag, `Kepler Field Flag` = pl_kepflag,
+         `K2 Mission Flag` = pl_k2flag, pl_nnotes, `Right Ascension (sexagesimal)` = ra_str, `Declination (sexagesimal)` = dec_str, `Right Ascension (decimal degrees)` = ra,
+         `Declination (decimal degrees)` = dec, st_dist:pl_facility)
+
+plnts <- planets %>% 
+  select(which(sapply(.,class) %in% c('integer', 'character')), -`Right Ascension (sexagesimal)`, - `Declination (sexagesimal)`, -loc_rowid, -rowupdate)%>%
+  sapply(function(x) as.factor(x))
+
+plnts2 <- planets %>% 
+  select( - which(sapply(.,class) %in% c('integer', 'character')), `Right Ascension (sexagesimal)`, `Declination (sexagesimal)`, loc_rowid, rowupdate) 
+
+planets <- cbind(plnts, plnts2)
 
 # A little bit of cleanup...
 
 # Name of observatories
+
+planets$pl_facility <- as.character(planets$pl_facility)
 
 planets$pl_facility[planets$pl_facility == "HATNet"] <- "Fred Lawrence Whipple Observatory (HATNet)"
 planets$pl_facility[planets$pl_facility == 'HATSouth'] <- "High Energy Stereoscopic System (HATSouth)"
 planets$pl_facility[planets$pl_facility %in% c("SuperWASP-South", "WASP-South")] <- "South African Astronomical Observatory (SuperWASP-South)"
 planets$pl_facility[planets$pl_facility == "SuperWASP-North"] <- "SuperWASP-North - Roque de Los Muchachos"
 planets$pl_facility[planets$pl_facility == "SuperWASP"] <- "SuperWASP - Roque de Los Muchachos "
+planets$pl_facility[planets$pl_facility == "MOA"] <- "University of Canterbury Mt John Observatory"
+
+
 
 ######## Exploring Correlation 
 
+
 num <- planets %>%
-  select(which(sapply(.,class) == 'numeric'), pl_pnum)
+  dplyr::select(which(sapply(.,class) == 'numeric'))
 
 y <- cor(num, use = "pairwise.complete.obs")
 
@@ -31,11 +53,12 @@ corrplot(y, type = 'lower')
 
 
 
+
 ### Celestial map
 
 # Aitoff projection: Convert declination and right ascension to pair of cartesian coordinates adjusted to aitoff grid.
 
-x <- astrolibR::aitoff(planets$ra, planets$dec)
+x <- astrolibR::aitoff(planets$`Right Ascension (decimal degrees)`, planets$`Declination (decimal degrees)`)
 
 #  Transform to sf object
 
@@ -55,7 +78,14 @@ ggplot(x, aes()) + geom_sf(col= 'white') + theme_nightsky()
 
 # Read in Milky way data
 
-milky_sf <- st_read("https://raw.githubusercontent.com/ofrohn/d3-celestial/master/data/mw.json", stringsAsFactors = F)
+milky_sf <- st_read("https://raw.githubusercontent.com/ofrohn/d3-celestial/master/data/mw.json", stringsAsFactors = F)  %>% 
+  st_cast("MULTILINESTRING") %>%  
+  st_cast("LINESTRING") %>%
+  group_by(id)%>%  
+  st_wrap_dateline(options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180")) 
+
+
+
 
 # Stars data
 
@@ -63,35 +93,60 @@ stars_sf <- st_read("https://raw.githubusercontent.com/ofrohn/d3-celestial/maste
 
 # Constellations data
 
-constellations_sf <- st_read("https://raw.githubusercontent.com/ofrohn/d3-celestial/master/data/constellations.lines.json", stringsAsFactors = F)
+constellations_sf <- st_read("https://raw.githubusercontent.com/ofrohn/d3-celestial/master/data/constellations.lines.json", 
+                             stringsAsFactors = F)  %>%  
+  st_wrap_dateline(options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180")) %>% 
+  st_cast("MULTILINESTRING")
+
 
 milky_sf_trans <- st_transform(milky_sf, crs = "+proj=moll")
 
+milky_sf_trans[3:202,]<- milky_sf_trans[3:202,] %>% 
+  st_cast("MULTIPOLYGON")
 
-### Facilities locations
+milky_sf_transclosed <- concaveman::concaveman(milky_sf_trans[1:2,])
 
-fac_df <- data.frame("facility" = unique(planets$pl_facility)) 
-fac_df$facility <- as.character(fac_df$facility)
-locs <- ggmap::mutate_geocode(fac_df, facility)
-  
-m <- leaflet() %>%
-  addTiles() %>%  # Add default OpenStreetMap map tiles
-  addMarkers(lng= locs$lon, lat=locs$lat,
-             popup=locs$facility)
+# Extract the constellation stars with names
+stars_con_sf<- stars_sf %>%  
+  filter(name!="") %>%  
+  filter(con!="")
+# Extract the brightest constellation stars with names, with an arbitrary cutoff 0.5 for mag - this extracts the top 10 brightest stars
+stars_bright_sf<- stars_con_sf %>% 
+  filter(mag<0.5)
+# Change the mag to a new scale newmag for the size aesthetic
+stars_bright_sf<-stars_bright_sf %>% 
+  mutate(newmag=-(mag-1.1)/4)
+
+# Use ggplot to plot the brighest stars by constellation
+stars_bright_sf %>% 
+  ggplot()+
+  # Group the stars by constellation
+  geom_sf(aes(size=newmag,fill=con,colour=con))+
+  geom_sf_text(aes(label=name), colour="white")+
+  theme_nightsky()+
+  # In this case add a legend to see the constellations and new magnitudes
+  theme(legend.position="right")
+
 
 
 ####
 
 options(scipen = 999)
+
+planets$pl_facility <- fct_explicit_na(planets$pl_facility, na_level = "Other")
+
+
 discovery_facilities <- planets %>%
-  group_by(pl_facility) %>%
+  group_by(pl_facility, .drop = F) %>%
   summarize('Discovered Planets' = n(),
-            'Discovery Methods' = n_distinct(pl_discmethod),
-            'Average Orbital Period (days)' = round(mean(pl_orbper, na.rm = T),2),
-            'Median Orbital Period (days)' = round(median(pl_orbper, na.rm = T),2),
-            'Average Orbit Semi-Major Axis (AU)' = round(mean(pl_orbsmax, na.rm = T),2),
-            'Median Orbit Semi-Major Axis (AU)' = round(median(pl_orbsmax, na.rm = T),2),
-            'Average Inclination (deg)' = round(mean(pl_orbincl, na.rm = T), 2))
+            'Discovery Methods' = n_distinct(`Discovery Method`),
+            'Average Orbital Period (days)' = round(mean(`Orbital Period (days)`, na.rm = T),2),
+            'Median Orbital Period (days)' = round(median(`Orbital Period (days)`, na.rm = T),2),
+            'Average Orbit Semi-Major Axis (AU)' = round(mean(`Orbit Semi-Major Axis (AU)`, na.rm = T),2),
+            'Median Orbit Semi-Major Axis (AU)' = round(median(`Orbit Semi-Major Axis (AU)`, na.rm = T),2),
+            'Average Inclination (deg)' = round(mean(`Inclination (deg)`, na.rm = T), 2)) 
+
+discovery_facilities$pl_facility <- as.character(discovery_facilities$pl_facility)
 
 # Use Google API key
 register_google(key = "AIzaSyDk3BpQG_3C2fgWJhgXXtuTRaDBbeB6FXg")
@@ -103,13 +158,43 @@ facility_coordinates <- ggmap::mutate_geocode(discovery_facilities, pl_facility)
 #We will use the coordinates of the data management center for Kepler related exoplanet discoveries.
 
 facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "Kepler",] <- c(-76.625466,39.3327283)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "KELT-North",] <- c(-110.6039461,31.6656759)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "KELT-South",] <- c(18.47,-33.93454)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "KMTNet",] <- c(-70.80634,-30.16896)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "MEarth Project",] <- c(-110.952,31.67525)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "OGLE",] <- c(-70.699,-29.01)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "Transiting Exoplanet Survey Satellite (TESS)",] <- c(-79.7084365,28.4886723)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "Xinglong Station",] <- c(117.575,40.3942)
+
+
+# Facility Websites 
+
+web <- data.frame(pl_facility = facility_coordinates$pl_facility ,website = c("www.nasa.gov","https://www.aao.gov.au/about-us/anglo-australian-telescope", "https://www.apo.nmsu.edu/", "https://www.naic.edu/ao/landing", "https://www.kasi.re.kr/eng/pageView/65",
+                                                                              "https://www.caha.es/", "http://www.ctio.noao.edu/noao/", "https://sci.esa.int/web/corot", "https://www.eso.org/public/", "https://www.cfa.harvard.edu/flwo", 
+                                                                              "https://www.cfa.harvard.edu/flwo", "https://www.gemini.edu", "http://www.obs-hp.fr/ohp.shtml", "https://hatsouth.org/", "https://hubblesite.org/",
+                                                                              "www.nasa.gov", "https://keplerscience.arc.nasa.gov/", "https://keltsurvey.org/", "http://www.winer.org/", "https://www.saao.ac.za/", "https://www.nasa.gov/mission_pages/kepler/main/index.html",
+                                                                              "https://www.noao.edu/kpno/", "http://kmtnet.kasi.re.kr/kmtnet-eng/", "http://www.lbto.org/", "http://www.lco.cl/", "https://www.eso.org/public/usa/teles-instr/lasilla/",
+                                                                              "https://en.wikipedia.org/wiki/Leoncito_Astronomical_Complex", "https://www.ucolick.org/main/index.html", "https://maunakeaobservatories.org/",
+                                                                              "https://mcdonaldobservatory.org/", "https://www.cfa.harvard.edu/MEarth/Telescopes.html", "www.nasa.gov",
+                                                                              "www.nasa.gov", "http://tdc-www.harvard.edu/oakridge/oakridge/", "http://www.astrouw.edu.pl/", "http://www.oao.nao.ac.jp/en/","http://www.astro.caltech.edu/palomar/homepage.html",
+                                                                              "https://www.eso.org/public/usa/teles-instr/paranal-observatory/", "https://www.parkes.atnf.csiro.au/", "http://www.qatarexoplanet.org/",
+                                                                              "http://www.iac.es/eno.php?op1=2&lang=en", "https://www.saao.ac.za/", "http://www.spitzer.caltech.edu/", "https://subarutelescope.org/",
+                                                                              "http://www.iac.es/eno.php?op1=2&lang=en", "http://www.iac.es/eno.php?op1=2&lang=en", "https://www.volcanoteide.com/en", "http://www.tls-tautenburg.de/TLS/index.php?id=2",
+                                                                              "https://www.nasa.gov/tess-transiting-exoplanet-survey-satellite/","https://lowell.edu/", "https://www.ukirt.hawaii.edu/","http://www.phys.canterbury.ac.nz/moa/", "http://www.keckobservatory.org/",
+                                                                              "http://www.xinglong-naoc.org/html/en/", "https://www.ifa.hawaii.edu/haleakalanew/observatories.shtml", "http://english.ynao.cas.cn/"))
+
+web$website <- paste0("<a href='",web$website,"'target = '_blank'>",web$pl_facility,"</a>")
+
+facility_coordinates <- inner_join(facility_coordinates,web, by = "pl_facility")
+
+
 
 mp <- leaflet() %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
   addMarkers(lng= facility_coordinates$lon, lat= facility_coordinates$lat,
              popup = paste(
                paste(tags$strong("Observatory: "),facility_coordinates$pl_facility, sep = ""), 
-               paste(tags$strong("Number of Discovered Planets: "), facility_coordinates$`Discovered Planets`, sep = ""), sep = '<br/>'))
-
+               paste(tags$strong("Number of Discovered Planets: "), facility_coordinates$`Discovered Planets`, sep = ""), 
+               paste(tags$strong("Website: "), paste(facility_coordinates$website), sep = ""),sep = '<br/>'))
 
 
