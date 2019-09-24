@@ -7,22 +7,29 @@ library(htmltools)
 library(shinydashboard)
 library(tidyverse)
 library(leaflet)
-library(ggvis)
-library(dygraphs)
+library(queryBuilder)
+library(jsonlite)
+library(shinyjs)
+library(shinyBS)
 
 # Define UI for application
 
 shinyUI(
-    fluidPage(titlePanel(
+
+    fluidPage(
+      tags$style(HTML(".tabbable > .nav > li[class=active]    > a {background-color: #258f5a; color:white}
+                      ")),
+  
+      titlePanel(
         fluidRow(
-            column(5, div(class = " titleContainer",tags$h2("Exoplanet Explorer", align = 'left'))),
+            column(5, div(class = " titleContainer", tags$a(tags$h2("Exoplanet Explorer", align = 'left'), onclick = "fakeClick('Description')"))),
             tags$style("h2{
                          color: #178acc;}"),
             column(1, '', windowTitle = 'Exoplanet Archive'),
             column(6, tags$a( href = "https://exoplanetarchive.ipac.caltech.edu",tags$img(src = "NASA.png",height = '80px', width = '180px', align = 'right'),target="_blank")),
 
-            tags$link(rel = "stylesheet", href="https://fonts.googleapis.com/css?family=Squada+One&display=swap"),
-            tags$style("h2{font-family: 'Squada One', serif;}")
+            tags$link(rel = "stylesheet", href="https://fonts.googleapis.com/css?family=Saira+Stencil+One&display=swap"),
+            tags$style("h2{font-family: 'Saira Stencil One', cursive;}")
                  )),
   
         div(id="navAlign",
@@ -40,6 +47,9 @@ shinyUI(
 ###################################################################################################################
     
     tabPanel("Description",class = "img3",
+             
+             # JS callback function to create links to tabs.
+             
              tags$head(tags$script(HTML('
         var fakeClick = function(tabName) {
           var dropdownList = document.getElementsByTagName("a");
@@ -51,47 +61,57 @@ shinyUI(
           }
         };
       '))),
-             tags$style(".navbar-default {
-                         background: #4979ab;}"),
+             tags$style(".navbar {
+                         background: #4979ab;}
+                       "),
             sidebarLayout(position = 'right', 
                 sidebarPanel(
-                    tags$style(".navbar-default {
-                         color: #cc3f3f;}"),
                     h1("NASA Exoplanet Archive"),
-                    hr(),
+                    hr(style = 'border-color:white;'),
                     p("The Nasa Exoplanet Archive is a service of the NASA Exoplanet Science Institute."),
                     br(),
-                    p("The Confirmed Planets table contains lists of parameters for each planet discovered by the Kepler and K2 missions, coupled with the efforts of 50+ observatories Worldwide. 
-                     The parameters in question were obtained by means of calculations and/or extracted from multiple references."),
-                    br(),
-                    p("This open source web app allows users to explore and interact with data from the Exoplanet Archive as well as from a few other sources.")
+                    p("This research has made use of the NASA Exoplanet Archive, which is operated by the California Institute of Technology, under contract with the National Aeronautics and Space Administration under the Exoplanet Exploration Program.")
                 ),
                 mainPanel(
                     tabsetPanel(type = c("tabs"),
-                        tabPanel("Identifying Exoplanets",
-                                 
-                                 tags$h5("Useful Neural Networks architecture for problems such as vetting transiting planet candidates"),
-                                 
-                                 tags$style("h5{color: #4979ab;
-                                 font-size: 15px;
-                                 font-style: bold;
-                                 }"),
-                                 
-                                 hr(),
-                                 p("The objective is to assess the likelihood that a given candidate is indeed a planet by means of training a deep convolutional neural
-                                   network. The model is designed in such a way that it becomes able to discriminate between a transiting exoplanet and a false positive such as 
-                                   eclipsing binaries, instrumental artifacts and stellar variability (Shallue & Vanderburg 2018).")),
+                  tabPanel("Background", p(br(),
+                  "At the present day, the progress we've made in the way we understand science, coupled with advances in technological means, have accelerated the global momentum towards space exploration and the search for extra-solar worlds.
+                                           This quest could become the premise of a new story, which would contain a propensity for innovative thinking on a societal scale. 
+                                           Hunting planets is an entertaining, paradigm shifting process, the uniqueness of which would be made even more special, should signs of 'Earthly' life be found in a 
+                  planetary system foreign to our own."),
+                  br(),
+                
+                  wellPanel(p("The launch of the Kepler Space Telescope has revolutionized space exploration by means of photometric techniques to observe hundreds of thousands of stars. The Kepler mission (May 2009 through May 2013), which aimed to discover
+                  Earth-sized planets located within the habitable zone of Solar-like systems,has led to the discovery of thousands of transiting exoplanets, in addition to numerous planet candidates."), style = 'padding: 5px;'),
+                  wellPanel(tags$img(src = "https://upload.wikimedia.org/wikipedia/commons/f/f0/Animation_of_Kepler_trajectory.gif", align = 'center', width = '600px', height = '400px'), style = 'padding:10px; width:620px;'),
+           
+                    wellPanel(p("This open source web app allows users to explore and interact with data from the Exoplanet Archive as well as from a few additional sources."), style = 'padding:5px;')),
                         tabPanel("Data",
-                                 tags$h5("1. Confirmed Planets Table"),
+                                 br(),
+                                 p("The interactive tables display data stored in the Exoplanet Archive,
+                                                        in a format that can be searched, filtered, sorted, plotted, and downloaded.
+                                                        A query builder is also available for conditional and complementary filtering."),
+                                 tabsetPanel(type = c("tabs"),
+                                        
+                                             tabPanel("Confirmed Planets",
+                                                      br(),
+                                 tags$a(tags$strong(tags$h5("1. Confirmed Planets Table")), onclick = "fakeClick('Confirmed Planets')"),
+                                 br(),
+                                 p("This table contains a set of confirmed exoplanets."),
                                  br(),
                                  wellPanel(style = "padding: 7px; width: 750px", p("The National Aeronautics and Space Administration (NASA) classifies objects as planetary, provided that they meet the following criteria:",
                                    tags$ul(
                                     tags$li("The mass of the object is equal to or less than 30 Jupiter masses;"),
                                     tags$li("The object is not free-floating;"),
                                     tags$li("Additional steps have been performed in order to exclude the probability that a confirmed planet is a false positive;")))),
+                                 p("The Confirmed Planets table contains lists of parameters for each planet discovered by the Kepler and K2 missions, coupled with the efforts of 50+ observatories Worldwide. 
+                     The parameters in question were obtained by means of calculations and/or extracted from multiple references.")),
+                                 tabPanel("Threshold-Crossing Events",
                                  br(),
-                                 tags$h5("2. Kepler Threshold-Crossing Events Table (TCE)"),
+                                 tags$a(tags$strong(tags$h5("2. Kepler Threshold-Crossing Events Table (TCE)")), onclick = "fakeClick('Threshold Crossing Events')"),
                                 
+                                 br(),
+                                 p("This table contains parameters for all targets observed by Kepler as Threshold Crossing Events (TCEs)."),
                                  br(),
                                  wellPanel(style = "padding: 7px; width: 750px",
                                            p("This table will be used to create a training dataset to identify signals of transiting planets in Kepler Light Curves.",
@@ -108,16 +128,18 @@ shinyUI(
                                                tags$li("The transit depth normalized by the mean uncertainty in the flux during the transits;"),
                                                tags$li("'The Autovetter' set label, which results from the use of a random forest model to classify TCE's into 3 categories - namely,
                                                        'Planet Candidate' (PC), 'Astrophysical False Positive (AFP)', and 'Non-Transiting Phenomena (NTP)'. The classification algotithm 
-                                                       of the 'Autovetter Project (McCauliff et al. 2015) discriminates events using features obtained from Kepler statistics."),
-                                               tags$hr(style="border-color: white;"),
-                                               p(tags$strong("The Threshold-Crossing Event Table is available here."), onclick = "fakeClick('Threshold Crossing Events')")
-                                             ))
-                                           
-                                 )),
+                                                       of the 'Autovetter Project (McCauliff et al. 2015) discriminates events using features obtained from Kepler statistics."))))))),
+                        
                         tabPanel("Light Curves",
                                  br(),
                                  tabsetPanel(type = c("tabs"),
-                                             tabPanel("Full Light Curve", wellPanel(
+                                             tabPanel("Intro",
+                                                      br(),
+                                                      wellPanel(tags$img(src= "transit.gif", width = '700px', height = '400px'), style = 'padding:10px; width:720px; background-color:orange;', align = 'center'),
+                                                      h6("Illustration of a light curve produced by a transiting planet.")),
+                                             tabPanel("Full Light Curve", 
+                                                      br(),
+                                                        wellPanel(
                                            h4("Light Curve Example - Target ID 12735740 (Kepler-86 b)"),
                                            tags$hr(style = 'border-color: white;'),
                                            p("The arrows in the below light curve example indicate transit events which have been observed for Target ID #12735740"),
@@ -126,13 +148,46 @@ shinyUI(
                                  p(br(), "The image above corresponds to the full light-curve of Star Kepler-86, over the entire Kepler mission. The arrows show a transiting planet, Kepler-86 b."), width = '100%', align = 'center',
                                  style = 'padding: 10px; width: 720px')),
                                  tabPanel("Global View",
+                                          br(),
                                           wellPanel(
                                             h4("Global View of Kepler-86's light curve:"),
                                             tags$hr(style = 'border-color:white;'),
+                                            p("The 'Global-View' is a fixed-length representation of the entire light curve.
+                                              This view is obtained by means of flattening, folding and centering the light curve on the TCE period.
+                                              Below is a representation of Kepler-86, with the main event centered at t = 0."),
                                             tags$img(src = '12735740_global_view.png', height = '400px', width = '700px'), 
                                             style = 'padding:10px; width:720px;', align = 'center'
                                           )))),
-                        tabPanel("Exploratory Graphs"),
+                        
+                        tabPanel("Identifying Exoplanets",
+                                 br(),
+                                 tags$h3("Using the Keras and Tensorflow libraries for vetting transiting planet candidates"),
+                                 
+                                 tags$style("h3{color: #4979ab;
+                                 font-size: 15px;
+                                 font-style: bold;
+                                 }"),
+                                 
+                                 hr(),
+                                 wellPanel(p("Among the recently developed techniques to facilitate the search for extra-solar planets (Exoplanets), deep learning has emerged as a promising tool."),
+                                 p("In this section, we will train a model using Keras combined with a Tensorflow backend to assess the likelihood that a given candidate is indeed a planet."),
+                                 p("Ideally, the model should be designed in such a way that it becomes able to discriminate between a transiting exoplanet and a false positive such as 
+                                   eclipsing binaries, instrumental artifacts and stellar variability (Shallue & Vanderburg 2018)."))),
+                        tabPanel("Exploratory Graphs",
+                                 br(),
+                                 wellPanel(tags$a(h4("Plot Section"), onclick = "fakeClick('Correlation')"), 
+                                           p("Interactive plots that allow you to visualize relationships between planetary and/or stellar parameters."), 
+                                           tags$hr(style = 'border-color:white;'),
+                                                                           tags$img(src = "CorrelationExample.png", height = '400px', width = '700px'),
+                                   tags$h6("figure 1. How planet radius behaves as a function of the Orbit Semi-Major axis length."),
+                                   align = 'center', width = '100%', style = 'padding:10px; width:720px',
+                                   p(br(), "These plots are generated from measurements extracted from the Confirmed Planets Table. Plot types include:"),
+                                   p(
+                                     tags$ul(
+                                     tags$li("Correlation graphs (figure 1) to show the relationship between two numerical variables;"), 
+                                     tags$li("Histograms and density plots to visualize variable distribution;"),
+                                     tags$li("Box plots for depicting groups of numerical data through their quartiles.")
+                                           )))),
                         tabPanel("Observatories")
                         
                     )
@@ -148,7 +203,8 @@ shinyUI(
 ###################################################################################################################
     
     navbarMenu("Data", 
-               tabPanel("Confirmed Planets", class = "my_img",
+       
+                 tabPanel("Confirmed Planets", class = "my_img",
              div(style = "padding: 20px !important; "),
              fluidPage(sidebarLayout(
                sidebarPanel(tags$style(".well {background-color:#375a7f;}"),
@@ -168,7 +224,8 @@ shinyUI(
                                                                                              href = "https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html", target = "_blank")))),
                  DT::dataTableOutput("planets", width = '100%'))))),
              
-             tabPanel("Threshold Crossing Events", class = 'img4', 
+                         tabPanel(
+                         "Threshold Crossing Events", class = 'img4', 
                       div(style = "padding: 20px !important;"),
                       fluidPage(sidebarLayout(
                         sidebarPanel(tags$style(".well {background-color: #375a7f};"),
@@ -180,8 +237,25 @@ shinyUI(
                                                selected = names(select(tce, -loc_rowid, `Kepler ID` = kepid, `Planet Number` = tce_plnt_num, `Orbital Period (days)` = tce_period,
                                                                        `Transit Epoch (BJD)` = tce_time0bk, `Impact Parameter` = tce_impact, `Transit Duration (Days)` = tce_duration,
                                                                        `Transit Depth (ppm)` = tce_depth, `Transit Signal to Noise (SNR)` = tce_model_snr, `Autovetter Training Set Label` = av_training_set)))),
-             mainPanel(DT::dataTableOutput("tce")))),
-             column(4,wellPanel(p("Documentation"))))),
+             mainPanel(DT::dataTableOutput("tce"))))),
+             
+             tabPanel("Query Builder",
+                      
+                      fluidPage(
+                        fluidRow(
+                          column(8, queryBuilderOutput('querybuilder', width = 800, height = 300)),
+                          column(2, uiOutput('txtValidation'))
+                        ),
+                        hr(),
+                        uiOutput('txtFilterText'),
+                        hr(),
+                        h4("Output Table", style="color:blue"),
+                        fluidRow(DT::dataTableOutput('dt')),
+                        hr(),
+                        h4("Output Filter List", style="color:blue"),
+                        verbatimTextOutput('txtFilterList'),
+                        verbatimTextOutput('txtSQL')
+                      ))),
 
 
 
@@ -196,7 +270,7 @@ navbarMenu("Exploratory Graphs",
                       column(6,
                             wellPanel(
                               div(style = "display: inline-block;vertical-align:top;", shinyWidgets::dropdownButton(
-                               tags$h3("Graph Options"),
+                               tags$h4("Graph Options"),
                                
                                selectInput('xcolumn', "X-Axis", choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -loc_rowid, -`Planet Hostname`)), 
                                            selected = "Planet Radius (Jupiter radii)"),
@@ -221,7 +295,7 @@ navbarMenu("Exploratory Graphs",
                                
                                hr(),
                                
-                               materialSwitch(inputId = "smooth", label = "Linear Regression", status = 'primary', value = T),
+                               materialSwitch(inputId = "smooth", label = "Linear Smoothing", status = 'primary', value = T),
                                materialSwitch(inputId = 'loess', label = "Lowess Smoothing", status = 'primary'),
                                
                                status = 'danger', icon = icon('gear'),
@@ -240,7 +314,7 @@ navbarMenu("Exploratory Graphs",
                       
                       column(6, 
                              wellPanel(div(style = "display: inline-block;vertical-align:top;", shinyWidgets::dropdownButton(
-                        tags$h3("BoxPlot Options"),
+                        tags$h4("BoxPlot Options"),
                         selectInput('x_col', "X-Axis", choices = names(planets %>% dplyr::select(which(sapply(.,class) %in% c('integer', 'character', 'factor')), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -loc_rowid, -`Planet Hostname`)), 
                                     selected = "Discovery Method"),status = 'danger', icon = icon('gear'),
                         tooltip = tooltipOptions(title = 'Global Options'))),
@@ -278,12 +352,12 @@ navbarMenu("Exploratory Graphs",
                     div(style = "padding: 20px !important; "),
                     class = "my_img",  
                    wellPanel(shinyWidgets::dropdownButton(
-                      tags$h3("List of Inputs"),
+                      tags$h4("List of Inputs"),
                       selectInput('xcol', "X-Variable", choices = names(planets %>% dplyr::select(which(sapply(.,class) %in% c('integer', 'character', 'factor', 'numeric')), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -loc_rowid, -`Planet Hostname`, `Planet Radius (Jupiter radii)`)), 
                                   selected = "Discovery Method"),status = 'danger', icon = icon('gear'),
                       tooltip = tooltipOptions(title = 'Global Options')), hr(), plotlyOutput("histograms")), hr(), 
                    wellPanel(shinyWidgets::dropdownButton(
-                     tags$h3("List of Inputs"),
+                     tags$h4("List of Inputs"),
                      selectInput('col_x', "X-Variable", choices = names(planets %>% dplyr::select(which(sapply(.,class) %in% c('integer', 'character', 'factor', 'numeric')), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -loc_rowid, -`Planet Hostname`, `Planet Radius (Jupiter radii)`)), 
                                  selected = "Planet Radius (Jupiter radii)"),
                      prettyCheckbox(inputId = "log_x", label = "Logarithmic Scale", icon = icon("check"), animation = 'pulse', value = T),status = 'danger', icon = icon('gear'),
@@ -328,19 +402,15 @@ tabPanel("Light Curves",
                                                  tce_plnt_num = list(inputId = 'tce_plnt_num', title = "Plnt Num: ")
                                                )),
 
-          DT::dataTableOutput("cond_table")), 
-          hr(), 
-          tags$img(src = "transitgif2.gif", align = 'center', width = '100%')),
+          DT::dataTableOutput("cond_table")),
+          hr(),
+          wellPanel(tags$img(src = "transitgif2.gif", align = 'center', width = '100%'), style = 'background-color:orange;')), 
           column(6, 
-                 wellPanel(actionButton("plot_", "Click to Plot"),
-                         plotOutput("full_lightcurve")),
-               hr(),
-               wellPanel(plotOutput('test')))
-
-       ),
-        
-        fluidRow(column(6), 
-                 column(6, plotOutput("cond_plot")))),
+                 wellPanel(actionBttn("plot_", "Plot", style = 'material-flat', icon = icon("chart-bar")),
+                           plotOutput("full_lightcurve")),
+                 hr(),
+                 wellPanel(plotOutput('test')))
+       )),
 
 
 
@@ -358,26 +428,51 @@ tabPanel("Dimensionality Reduction and K-means Clustering"),
 
 
 
-tabPanel("Observatories", class = 'my_img2',
+tabPanel("Observatories", 
+           tabPanel("Interactive Map" ,class = 'my_img2',
          div(style = "padding: 20px !important;"),
          div(style = 'margin-bottom: 10px;'),
-         
-         sidebarLayout(
-             sidebarPanel(sliderInput(
-                inputId = "pl_discovered",label = "Number of Discovered Planets", min = min(facility_coordinates$`Discovered Planets`),
-                max = 400, step = NULL, value = c(min(facility_coordinates$`Discovered Planets`), max(facility_coordinates$`Discovered Planets`))),
-                shinyWidgets::prettyCheckbox("kepler", label = "Include Kepler Mission (+2,000 planets discovered)", value = T, animation = 'jelly', status = 'info'),
-                tags$img(src = "https://upload.wikimedia.org/wikipedia/commons/f/f0/Animation_of_Kepler_trajectory.gif", align = 'center', width = '100%')
-             ),
+         tags$style(type = "text/css", "#facilities {height: calc(100vh - 80px) !important;}"),
+         div(class = 'outer'),
+         tags$head(includeCSS('style.css')),
+        
              
-             mainPanel(leafletOutput("facilities", width = "100%"), 
-                       br(),
-                       dataTableOutput("obs_table")))),
+             
+             leafletOutput("facilities", width = "100%"),
+             absolutePanel(id = "controls", class = "panel panel-default", fixed = F,
+                           draggable = TRUE, top = 235, left = "auto", right = 'auto', bottom = "auto",
+                           width = 480, height = "auto",
+                           
+                           h2("Observatory Explorer"),
+                           tags$style(HTML('#obs_table table.dataTable tr:nth-child(even) {background-color: black !important;}')),
+                           tags$style(HTML('#obs_table table.dataTable tr:nth-child(odd) {background-color: white !important;}')),
+                           tags$style(HTML('#obs_table table.dataTable tr:nth-child(odd) {color: black !important;}')),
+                           tags$style(HTML('#obs_table table.dataTable th {background-color: white !important;}')),
+                           tags$style(HTML('#obs_table table.dataTable th {color: black !important;}')),
+                           
+                           
+                        sliderInput(
+                             inputId = "pl_discovered",label = "Number of Discovered Planets", min = min(facility_coordinates$`Discovered Planets`), 
+                             max = 400, step = NULL, value = c(min(facility_coordinates$`Discovered Planets`), max(facility_coordinates$`Discovered Planets`))),
+                             shinyWidgets::prettyCheckbox("kepler", label = "Include Kepler Mission (+2,000 planets discovered)", value = T, animation = 'jelly', status = 'info'),
+                        dataTableOutput("obs_table"),style = 'background-color:white;'
+                           ), uiOutput("modals"))),
 
 ###################################################################################################################
 
 tabPanel("Sources"),
-tabPanel("Contact"),
+tabPanel("Contact",
+         wellPanel(tags$ul(
+           tags$li(tags$a(actionBttn(style = 'material-flat', inputId = "linkedin", label = "Linkedin", icon = icon('linkedin')),href = "https://www.linkedin.com/in/jean-claude-kameni-3665a823/", target = "_blank")),
+           hr(style = 'border-color:white;'),
+           tags$li(tags$a(actionBttn(style = 'material-flat', inputId = 'github', label = "Github", icon = icon('github')), href = "https://github.com/WanderingNomad77", target = "_blank")),
+           hr(style = 'border-color:white;'),
+           tags$li(tags$a(actionBttn(style = 'material-flat', inputId = 'instagram', label = "Instagram", icon = icon('instagram')), href = "https://www.instagram.com/j.c.k.206/", target = "_blank")),
+           hr(style = 'border-color:white;'),
+           tags$li(tags$a(actionBttn(style = 'material-flat',inputId = "email1", label = "Email Me", 
+                          icon = icon("envelope", lib = "font-awesome")),
+             href="mailto:kamenijc@gmail.com"))),
+           style = "background-color: #4979ab;width: 400px"), 
 
 
 ###################################################################################################################
@@ -395,10 +490,10 @@ tags$head(
     tags$style(HTML(".img4{background-image: url(earth.jpg);}")),    
     tags$style(HTML(".img4{margin-top: -20px;}")),
     tags$style(HTML(".img4{margin_bottom: -18px;}")),
-    tags$style(HTML(".img4{margin-right: -14px;} .img4{margin-left: -14px;} .img4{padding-left: 10px;} .img4{padding-right: 10px !important; height: 720px;}")),
+    tags$style(HTML(".img4{margin-right: -14px;} .img4{margin-left: -14px;} .img4{padding-left: 10px;} .img4{padding-right: 10px !important; height: 1020px;}")),
     
 
-tags$style(HTML(".img3{background-image: url(https://upload.wikimedia.org/wikipedia/commons/c/cc/Kepler-452b_artist_concept_-_animated_GIF.gif);}
+tags$style(HTML(".img3{background-image: url(Kepler452b.gif);}
                           .img3{margin-top: 20px; height: 720px;}  ")),
 
 tags$style(HTML(".img{background-image: url(dims.jpeg);}")),    
@@ -407,4 +502,4 @@ tags$style(HTML(".img{background-image: url(dims.jpeg);}")),
           tags$style(HTML(".img{margin-right: -5px;} .img{margin-left: 5px;} .img{padding-left: 5px;} .img{padding-right: -5px !important; height: 100%;}")))
 
 
-))))
+)))))

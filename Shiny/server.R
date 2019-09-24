@@ -5,12 +5,14 @@ library(Cairo)
 library(ggthemes)
 library(ggthemr)
 library(parallel)
+library(dplyr)
 
 
 # Define server logic 
 
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
 
+  
   # Dowloads tab datatable 
   
     output$planets <- DT::renderDataTable({
@@ -410,8 +412,11 @@ options(scipen = 999)
         addProviderTiles(providers$Stamen.Toner) %>%  # Add default OpenStreetMap map tiles
         addMarkers(lng= qsub()$lon, lat= qsub()$lat,
                    popup = paste(
-                     paste(tags$strong("Observatory: "),qsub()$pl_facility, sep = ""), 
-                     paste(tags$strong("Number of Discovered Planets: "), qsub()$`Discovered Planets`, sep = ""), sep = '<br/>'))
+                     paste(tags$strong("Observatory: "), qsub()$website, sep = ""), 
+                     paste(tags$strong("Number of Planets Discovered: "), qsub()$`Discovered Planets`, sep = ""),
+                     paste(tags$strong("Discovery Methods: "), qsub()$`Discovery Methods`, sep = ""),
+                     sep = '<br/>')) %>%
+        setView(lng = -93.85, lat = 37.45, zoom = 4)
       
       m
       
@@ -420,8 +425,9 @@ options(scipen = 999)
       if(input$kepler) 
         proxy2 %>%
         addMarkers(popup = paste(
-          paste(tags$strong("Observatory: "), "Kepler Mission", sep = ""), 
-          paste(tags$strong("Number of Discovered Planets: "), facility_coordinates$`Discovered Planets`[facility_coordinates$pl_facility == "Kepler"], sep = ""), sep = '<br/>'),
+          paste(tags$strong("Observatory: "), facility_coordinates$website[facility_coordinates$pl_facility == 'Kepler'], sep = ""),
+          paste(tags$strong("Number of Discovered Planets: "), facility_coordinates$`Discovered Planets`[facility_coordinates$pl_facility == "Kepler"], sep = ""),
+          sep = '<br/>'),
           lng =-76.62547,
           lat = 39.33273)
       
@@ -431,11 +437,96 @@ options(scipen = 999)
     
     # Data table
     
+    dat <- facility_coordinates
+    
+    buttons <- lapply(1:ncol(dat), function(i){
+      actionButton(
+        paste0("this_id_is_not_used",i),
+        "plot",
+        class = "btn-primary btn-sm",
+        style = "border-radius: 50%;", 
+        onclick = sprintf(
+          "Shiny.setInputValue('button', %d, {priority:'event'});
+        $('#modal%d').modal('show');", i, i)
+      )
+    })
+    
     output$obs_table <- renderDataTable({
+      sketch <- tags$table(
+        class = "row-border stripe hover compact",
+        tableHeader(c("", names(qsub()))),
+        tableFooter(c("", buttons))
+      )
 
-      DT::datatable(qsub(), style = 'bootstrap', selection = 'single',options = list(pageLength = 5, scrollX = T, stateSave = T))
+      DT::datatable(qsub(), container = sketch, style = 'bootstrap', selection = 'single',options = list(pageLength = 5, scrollX = T, stateSave = T, columnDefs = list(
+        list(
+          className = "dt-center",
+          targets = "_all"
+        )
+      )), escape = F)
+      
       
     })
+    
+ 
+      output$modals <- renderUI({
+        lapply(1:ncol(dat), function(i){
+          bsModal(
+            id = paste0("modal",i),
+            title = names(dat)[i],
+            trigger = paste0("this_is_not_used",i),
+            if(is.numeric(dat[[i]]) && length(unique(dat[[i]]))>19){
+              fluidRow(
+                column(5, radioButtons(paste0("radio",i), "",
+                                       c("density", "histogram"), inline = TRUE),
+                       prettyCheckbox(paste0('chkbox',i),"Log")),
+                column(7,
+                       conditionalPanel(
+                         condition = sprintf("input.radio%d=='histogram'",i),
+                         sliderInput(paste0("slider",i), "Number of bins",
+                                     min = 5, max = 100, value = 30)
+                       ))
+              )
+            },
+            plotOutput(paste0("plot",i))
+          )
+        })
+      })
+      
+      # plots in modals ####
+      
+      for(i in 1:ncol(dat)){
+        local({
+          ii <- i
+          output[[paste0("plot",ii)]] <- renderPlot({
+            if(is.numeric(dat[[ii]]) && length(unique(dat[[ii]]))>19){
+              if(input[[paste0("radio",ii)]] == "density"){
+                pp <- ggplot(qsub(), aes_string(as.name(names(qsub())[ii]))) + 
+                  geom_density(fill = "seashell", color = "seashell") + 
+                  stat_density(geom = "line", size = 1) + 
+                  theme_bw() + theme(axis.title = element_text(size = 16))
+                print(pp)
+                if(input[[paste0('chkbox',ii)]])
+                  pp + scale_x_log10()
+              }else{
+                ggplot(qsub(), aes_string(as.name(names(qsub())[ii]))) + 
+                  geom_histogram(bins = input[[paste0("slider",ii)]]) + 
+                  theme_bw() + theme(axis.title = element_text(size = 16))
+              }
+            }else{
+             
+              ggplot(qsub(), aes_string(as.name(names(qsub())[ii]))) + geom_bar() + 
+                geom_text(stat="count", aes(label=..count..), vjust=-0.5) + 
+                xlab(names(qsub())[ii]) + theme_bw()
+             
+              
+            }
+          
+          })
+          
+        })
+      }
+
     
     new_icon <- makeAwesomeIcon(icon ='flag',markerColor = "red", iconColor = 'white')
     
@@ -447,25 +538,83 @@ options(scipen = 999)
       proxy <- leafletProxy("facilities")
       proxy %>%
         addAwesomeMarkers(popup = paste(
-          paste(tags$strong("Observatory: "),row_selected$pl_facility, sep = ""), 
-          paste(tags$strong("Number of Discovered Planets: "), row_selected$`Discovered Planets`, sep = ""), sep = '<br/>'),
+          paste(tags$strong("Observatory: "), row_selected$website, sep = ""),
+          paste(tags$strong("Number of Discovered Planets: "), row_selected$`Discovered Planets`, sep = ""),
+          paste(tags$strong("Discovery Methods: "), row_selected$`Discovery Methods`, sep = ""),
+          sep = '<br/>'),
           layerId = row_selected$pl_facility,
           lng = row_selected$lon,
           lat = row_selected$lat,
-          icon = new_icon)
+          icon = new_icon) %>%
+        setView(zoom = 4, lat = row_selected$lat, lng = row_selected$lon)
       
       if(!is.null(previous_row())) {
         
         proxy %>%
           addMarkers(popup = paste(
-            paste(tags$strong("Observatory: "),previous_row()$pl_facility, sep = ""), 
-            paste(tags$strong("Number of Discovered Planets: "), previous_row()$`Discovered Planets`, sep = ""), sep = '<br/>'),
+            paste(tags$strong("Website: "), previous_row()$website, sep = ""), 
+            paste(tags$strong("Number of Discovered Planets: "), previous_row()$`Discovered Planets`, sep = ""),
+            paste(tags$strong("Discovery Methods: "), previous_row()$`Discovery Methods`, sep = ""),
+            sep = '<br/>'),
             layerId = previous_row()$pl_facility,
             lng = previous_row()$lon,
             lat = previous_row()$lat)
       }
       previous_row(row_selected)
     })
+    
+
  
- 
+ ########
+    
+    #TEST
+    
+    
+    output$querybuilder <- renderQueryBuilder({
+      queryBuilder(data = df.data, filters = list(list(name = 'Planet Hostname', type = 'string'),
+                                                  list(name = 'pl_letter', type = 'string'),
+                                                       list(name = 'Planet Name', type = 'string'),
+                                                       list(name = 'Discovery Method', type = 'string', input = 'selectize')),
+                                                  
+                                                  autoassign = FALSE,
+                                                  default_condition = 'AND',
+                                                  allow_empty = TRUE,
+                                                  display_errors = FALSE,
+                                                  display_empty_filter = FALSE
+      )
+    })
+    
+    output$txtValidation <- renderUI({
+      if(input$querybuilder_validate == TRUE) {
+        h3('VALID QUERY', style="color:green")
+      } else {
+        h3('INVALID QUERY', style="color:red")
+      }
+    })
+    
+    output$txtFilterText <- renderUI({
+      req(input$querybuilder_validate)
+      h4(span('Filter sent to dplyr: ', style="color:blue"), span(filterTable(input$querybuilder_out, df.data, 'text'), style="color:green"))
+    })
+    
+    output$txtFilterList <- renderPrint({
+      req(input$querybuilder_validate)
+      input$querybuilder_out
+    })
+    
+    output$txtSQL <- renderPrint({
+      req(input$querybuilder_validate)
+      input$querybuilder_sql
+    })
+    
+    
+    output$dt <- renderDataTable({
+      req(input$querybuilder_validate)
+      df <- filterTable(input$querybuilder_out, df.data, 'table')
+      DT::datatable(df)
+    })
+    
+
+  
+    
 })
