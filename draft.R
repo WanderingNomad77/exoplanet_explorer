@@ -193,3 +193,17 @@ t <- tf$concat(list(period, t0, duration, time, flux), 1L)
 
 
 read_curve <- apply(data.frame(unique_kepid$kepid[1]), 1, function(x) generate_view(x, directory = base_directory))
+
+
+
+
+
+observeEvent(input$facilities_marker_click,
+             {data$clickedMarker <- input$facilities_marker_click
+             
+             print(data$clickedMarker)})
+
+observeEvent(row_selected,
+             {data$clickedMarker <- NULL
+             
+             print(data$clickedMarker)})

@@ -6,6 +6,7 @@ library(sf)
 library(corrplot)
 library(ggmap)
 library(concaveman)
+source("lightcurves/curves_as_images.R")
 
 # Import data
 
@@ -17,12 +18,23 @@ planets <- read.csv('planets_2019.07.09_21.07.01.csv', stringsAsFactors = F, ski
          `K2 Mission Flag` = pl_k2flag, pl_nnotes, `Right Ascension (sexagesimal)` = ra_str, `Declination (sexagesimal)` = dec_str, `Right Ascension (decimal degrees)` = ra,
          `Declination (decimal degrees)` = dec, st_dist:pl_facility)
 
+planets <- read.csv("planets_2019.09.29_21.45.42.csv", stringsAsFactors = F, skip = 46, na.strings = c("NA", "")) %>%
+  select(`Planet Hostname` = pl_hostname, `Planet Letter` = pl_letter, `Planet Name` = pl_name, `Discovery Method` = pl_discmethod, pl_controvflag, `Number of Planets in System` = pl_pnum,
+         `Orbital Period (days)` = pl_orbper, `Orbit Semi-Major Axis (AU)` = pl_orbsmax, Eccentricity = pl_orbeccen, `Inclination (deg)` = pl_orbincl, 
+         `Planet Mass or M*sin(i) [Jupiter mass]` = pl_bmassj, `Planet Radius (Jupiter radii)` = pl_radj, `Planet Density (g/cm**3)` = pl_dens,
+         `Planet Mass or M*sin(i) Provenance` = pl_bmassprov, `TTV Flag` = pl_ttvflag, `Kepler Field Flag` = pl_kepflag,
+         `K2 Mission Flag` = pl_k2flag, `Right Ascension (sexagesimal)` = ra_str, `Declination (sexagesimal)` = dec_str, `Right Ascension (decimal degrees)` = ra,
+         `Declination (decimal degrees)` = dec, `Distance (pc)` = st_dist, `Gaia Distance (pc)` = gaia_dist ,`Optical Magnitude (Brightess of Host Star) [mag]` = st_optmag, 
+         `Optical Magnitude Band` = st_optband, `G-band (Gaia) [mag]` = gaia_gmag, `Host Star Effective Temperature (K)` = st_teff, `Stellar Mass` = st_mass, `Stellar Radius (solar radii)` = st_rad,
+          `Transit Depth (percentage)` = pl_trandep, `Transit Duration (days)` = pl_trandur, `Transit Midpoint (Julian Days)` = pl_tranmid, `Year of Discovery` = pl_disc,
+         `Discovery Facility` = `pl_facility`, `Link to Exoplanet Encyclopedia` = pl_pelink)
+ 
 plnts <- planets %>% 
-  select(which(sapply(.,class) %in% c('integer', 'character')), -`Right Ascension (sexagesimal)`, - `Declination (sexagesimal)`, -loc_rowid, -rowupdate)%>%
+  select(which(sapply(.,class) %in% c('integer', 'character')), -`Right Ascension (sexagesimal)`, - `Declination (sexagesimal)`)%>%
   sapply(function(x) as.factor(x))
 
 plnts2 <- planets %>% 
-  select( - which(sapply(.,class) %in% c('integer', 'character')), `Right Ascension (sexagesimal)`, `Declination (sexagesimal)`, loc_rowid, rowupdate) 
+  select( - which(sapply(.,class) %in% c('integer', 'character')), `Right Ascension (sexagesimal)`, `Declination (sexagesimal)`) 
 
 planets <- cbind(plnts, plnts2)
 
@@ -30,14 +42,14 @@ planets <- cbind(plnts, plnts2)
 
 # Name of observatories
 
-planets$pl_facility <- as.character(planets$pl_facility)
+planets$`Discovery Facility` <- as.character(planets$`Discovery Facility`)
 
-planets$pl_facility[planets$pl_facility == "HATNet"] <- "Fred Lawrence Whipple Observatory (HATNet)"
-planets$pl_facility[planets$pl_facility == 'HATSouth'] <- "High Energy Stereoscopic System (HATSouth)"
-planets$pl_facility[planets$pl_facility %in% c("SuperWASP-South", "WASP-South")] <- "South African Astronomical Observatory (SuperWASP-South)"
-planets$pl_facility[planets$pl_facility == "SuperWASP-North"] <- "SuperWASP-North - Roque de Los Muchachos"
-planets$pl_facility[planets$pl_facility == "SuperWASP"] <- "SuperWASP - Roque de Los Muchachos "
-planets$pl_facility[planets$pl_facility == "MOA"] <- "University of Canterbury Mt John Observatory"
+planets$`Discovery Facility`[planets$`Discovery Facility` == "HATNet"] <- "Fred Lawrence Whipple Observatory (HATNet)"
+planets$`Discovery Facility`[planets$`Discovery Facility` == 'HATSouth'] <- "High Energy Stereoscopic System (HATSouth)"
+planets$`Discovery Facility`[planets$`Discovery Facility` %in% c("SuperWASP-South", "WASP-South")] <- "South African Astronomical Observatory (SuperWASP-South)"
+planets$`Discovery Facility`[planets$`Discovery Facility` == "SuperWASP-North"] <- "SuperWASP-North - Roque de Los Muchachos"
+planets$`Discovery Facility`[planets$`Discovery Facility` == "SuperWASP"] <- "SuperWASP - Roque de Los Muchachos "
+planets$`Discovery Facility`[planets$`Discovery Facility` == "MOA"] <- "University of Canterbury Mt John Observatory"
 
 
 
@@ -133,11 +145,11 @@ stars_bright_sf %>%
 
 options(scipen = 999)
 
-planets$pl_facility <- fct_explicit_na(planets$pl_facility, na_level = "Other")
+planets$`Discovery Facility` <- fct_explicit_na(planets$`Discovery Facility`, na_level = "Other")
 
 
 discovery_facilities <- planets %>%
-  group_by(pl_facility, .drop = F) %>%
+  group_by(`Discovery Facility`, .drop = F) %>%
   summarize('Discovered Planets' = n(),
             'Discovery Methods' = n_distinct(`Discovery Method`),
             'Average Orbital Period (days)' = round(mean(`Orbital Period (days)`, na.rm = T),2),
@@ -146,46 +158,56 @@ discovery_facilities <- planets %>%
             'Median Orbit Semi-Major Axis (AU)' = round(median(`Orbit Semi-Major Axis (AU)`, na.rm = T),2),
             'Average Inclination (deg)' = round(mean(`Inclination (deg)`, na.rm = T), 2)) 
 
-discovery_facilities$pl_facility <- as.character(discovery_facilities$pl_facility)
+discovery_facilities$`Discovery Facility` <- as.character(discovery_facilities$`Discovery Facility`)
 
 # Use Google API key
 register_google(key = "AIzaSyDk3BpQG_3C2fgWJhgXXtuTRaDBbeB6FXg")
 
 # Add coordinates
-facility_coordinates <- ggmap::mutate_geocode(discovery_facilities, pl_facility)
+facility_coordinates <- ggmap::mutate_geocode(discovery_facilities, `Discovery Facility`)
 
 # Kepler is actually not an observatory facility, but a space telescope. The Data is collected at the .. located on the John blabla. 
 #We will use the coordinates of the data management center for Kepler related exoplanet discoveries.
 
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "Kepler",] <- c(-76.625466,39.3327283)
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "KELT-North",] <- c(-110.6039461,31.6656759)
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "KELT-South",] <- c(18.47,-33.93454)
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "KMTNet",] <- c(-70.80634,-30.16896)
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "MEarth Project",] <- c(-110.952,31.67525)
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "OGLE",] <- c(-70.699,-29.01)
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "Transiting Exoplanet Survey Satellite (TESS)",] <- c(-79.7084365,28.4886723)
-facility_coordinates[,c("lon", "lat")][facility_coordinates$pl_facility == "Xinglong Station",] <- c(117.575,40.3942)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "Kepler",] <- c(-76.625466,39.3327283)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "KELT-North",] <- c(-110.6039461,31.6656759)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "KELT-South",] <- c(18.47,-33.93454)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "KMTNet",] <- c(-70.80634,-30.16896)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "MEarth Project",] <- c(-110.952,31.67525)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "OGLE",] <- c(-70.699,-29.01)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "Transiting Exoplanet Survey Satellite (TESS)",] <- c(-79.7084365,28.4886723)
+facility_coordinates[,c("lon", "lat")][facility_coordinates$`Discovery Facility` == "Xinglong Station",] <- c(117.575,40.3942)
 
 
 # Facility Websites 
 
-web <- data.frame(pl_facility = facility_coordinates$pl_facility ,website = c("www.nasa.gov","https://www.aao.gov.au/about-us/anglo-australian-telescope", "https://www.apo.nmsu.edu/", "https://www.naic.edu/ao/landing", "https://www.kasi.re.kr/eng/pageView/65",
+web <- data.frame("Discovery Facility" = facility_coordinates$`Discovery Facility` ,website = c("www.nasa.gov", "https://www.aao.gov.au/about-us/anglo-australian-telescope", "https://www.apo.nmsu.edu/", "https://www.naic.edu/ao/landing", "https://www.kasi.re.kr/eng/pageView/65",
                                                                               "https://www.caha.es/", "http://www.ctio.noao.edu/noao/", "https://sci.esa.int/web/corot", "https://www.eso.org/public/", "https://www.cfa.harvard.edu/flwo", 
                                                                               "https://www.cfa.harvard.edu/flwo", "https://www.gemini.edu", "http://www.obs-hp.fr/ohp.shtml", "https://hatsouth.org/", "https://hubblesite.org/",
                                                                               "www.nasa.gov", "https://keplerscience.arc.nasa.gov/", "https://keltsurvey.org/", "http://www.winer.org/", "https://www.saao.ac.za/", "https://www.nasa.gov/mission_pages/kepler/main/index.html",
-                                                                              "https://www.noao.edu/kpno/", "http://kmtnet.kasi.re.kr/kmtnet-eng/", "http://www.lbto.org/", "http://www.lco.cl/", "https://www.eso.org/public/usa/teles-instr/lasilla/",
+                                                                              "https://www.noao.edu/kpno/", "http://kmtnet.kasi.re.kr/kmtnet-eng/", "http://koinet.astro.physik.uni-goettingen.de/", "http://www.lbto.org/", "http://www.lco.cl/", "https://www.eso.org/public/usa/teles-instr/lasilla/",
                                                                               "https://en.wikipedia.org/wiki/Leoncito_Astronomical_Complex", "https://www.ucolick.org/main/index.html", "https://maunakeaobservatories.org/",
                                                                               "https://mcdonaldobservatory.org/", "https://www.cfa.harvard.edu/MEarth/Telescopes.html", "www.nasa.gov",
                                                                               "www.nasa.gov", "http://tdc-www.harvard.edu/oakridge/oakridge/", "http://www.astrouw.edu.pl/", "http://www.oao.nao.ac.jp/en/","http://www.astro.caltech.edu/palomar/homepage.html",
                                                                               "https://www.eso.org/public/usa/teles-instr/paranal-observatory/", "https://www.parkes.atnf.csiro.au/", "http://www.qatarexoplanet.org/",
                                                                               "http://www.iac.es/eno.php?op1=2&lang=en", "https://www.saao.ac.za/", "http://www.spitzer.caltech.edu/", "https://subarutelescope.org/",
                                                                               "http://www.iac.es/eno.php?op1=2&lang=en", "http://www.iac.es/eno.php?op1=2&lang=en", "https://www.volcanoteide.com/en", "http://www.tls-tautenburg.de/TLS/index.php?id=2",
-                                                                              "https://www.nasa.gov/tess-transiting-exoplanet-survey-satellite/","https://lowell.edu/", "https://www.ukirt.hawaii.edu/","http://www.phys.canterbury.ac.nz/moa/", "http://www.keckobservatory.org/",
+                                                                              "https://www.nasa.gov/tess-transiting-exoplanet-survey-satellite/","https://lowell.edu/", "https://www.ukirt.hawaii.edu/", "http://www.phys.canterbury.ac.nz/moa/", "http://www.keckobservatory.org/",
                                                                               "http://www.xinglong-naoc.org/html/en/", "https://www.ifa.hawaii.edu/haleakalanew/observatories.shtml", "http://english.ynao.cas.cn/"))
 
-web$website <- paste0("<a href='",web$website,"'target = '_blank'>",web$pl_facility,"</a>")
 
-facility_coordinates <- inner_join(facility_coordinates,web, by = "pl_facility")
+web <- select(web, `Discovery Facility` = Discovery.Facility, website)
+
+web$website <- paste0("<a href='",web$website,"'target = '_blank'>",web$`Discovery Facility`,"</a>")
+
+
+colnames(planets)[colnames(planets) == "Link to Exoplanet Encyclopedia"] <- "urls"
+planets$urls <- as.character(planets$urls)
+planets$urls[is.na(planets$urls)] <- "https://google.com"
+
+
+facility_coordinates <- inner_join(facility_coordinates,web, by = "Discovery Facility")
+facility_coordinates$`Discovery Facility` <- as.factor(facility_coordinates$`Discovery Facility`)
 
 
 
@@ -193,8 +215,21 @@ mp <- leaflet() %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
   addMarkers(lng= facility_coordinates$lon, lat= facility_coordinates$lat,
              popup = paste(
-               paste(tags$strong("Observatory: "),facility_coordinates$pl_facility, sep = ""), 
+               paste(tags$strong("Observatory: "),facility_coordinates$`Discovery Facility`, sep = ""), 
                paste(tags$strong("Number of Discovered Planets: "), facility_coordinates$`Discovered Planets`, sep = ""), 
                paste(tags$strong("Website: "), paste(facility_coordinates$website), sep = ""),sep = '<br/>'))
 
+## Query Builder
 
+df.data <- planets
+df.data$name <- row.names(df.data)
+df.data$nameFactor <- as.factor(df.data$name)
+
+# TCEs
+
+set.seed(2019)
+
+tce <- read.csv("tce.csv", stringsAsFactors = F) %>%
+  filter(av_training_set != "UNK") %>%
+  mutate(tce_duration = tce_duration/24) %>%         # Convert hours to days. 
+  slice(sample(1:n()))                               # Randomly permute rows.
