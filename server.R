@@ -1,12 +1,4 @@
 library(shiny)
-library(DT)
-library(grid)
-library(Cairo)
-library(ggthemes)
-library(ggthemr)
-library(parallel)
-library(dplyr)
-library(leafpop)
 
 
 # Define server logic 
@@ -14,14 +6,24 @@ library(leafpop)
 shinyServer(function(input, output, session) {
 
   
-    output$planets <- DT::renderDataTable({
+  
+###################################################################################################################
+#                                                    DATA                                                         #
+###################################################################################################################
+  
+    output$planets <- DT::renderDataTable(server = F, {
         
   
         DT::datatable(
           data = planets[, input$show_vars, drop = F], 
           extensions = 'Buttons', style = 'bootstrap', escape = F, 
           options = list(
-            dom = 'Bfrtip',buttons = list('copy', 'print'), 
+            dom = 'Bfrtip', buttons = 
+              list('copy', 'print', list(
+                extend = 'collection',
+                buttons = c('csv', 'excel', 'pdf'),
+                text = 'Download'
+              )), 
             scrollX =T)) %>%
             formatStyle(names(planets[, input$show_vars]), color = 'white')
         
@@ -34,13 +36,6 @@ shinyServer(function(input, output, session) {
       summary(planets[,(input$var1)])
     })
     
-    # Dowloads tab datatable 
-    output$download <- downloadHandler(
-      filename = paste("planetary_data",Sys.Date(), ".csv", sep = ""),
-      content = function(file) {
-        write.csv(planets[, input$show_vars, drop = F], file, row.names = F)
-      }
-    )
     
     # TCE Table
     
@@ -141,9 +136,13 @@ shinyServer(function(input, output, session) {
       df <- filterTable(input$querybuilder_out, df.data, 'table')
       df <- df %>%
         select(-name, -nameFactor)
-      DT::datatable(df ,style = 'bootstrap', extensions = c('Responsive', 'Buttons'), options = list(dom = 'Bfrtip', 
-                                                                                                     buttons = 
-                                                                                                       list('copy', 'print',I('colvis'), list(
+      DT::datatable(df ,style = 'bootstrap', extensions = c('Responsive', 'Buttons', 'Scroller'), options = list(dom = 'Bfrtip',
+                                                                                                                 deferRender = F,
+                                                                                                                 scrollY = 200,
+                                                                                                                 scroller = TRUE,
+                                                                                                       buttons = 
+                                                                                                       list('copy', 'print',I('colvis'),
+                                                                                                            list(
                                                                                                          extend = 'collection',
                                                                                                          buttons = c('csv', 'excel', 'pdf'),
                                                                                                          text = 'Download'
@@ -164,7 +163,11 @@ shinyServer(function(input, output, session) {
        xlab('Right Ascension') + 
        ylab('Declination') +
        theme(axis.title.y = element_text(angle = 90)) +
-       theme_nightsky()
+       theme_nightsky() + theme(axis.line=element_blank(),axis.text.x=element_blank(),
+                              axis.text.y=element_blank(),axis.ticks=element_blank(),
+                              
+                              panel.border=element_blank(),panel.grid.major=element_blank(),
+                              panel.grid.minor=element_blank())
         
      s1 = input$tbl_rows_selected
    
@@ -173,36 +176,30 @@ shinyServer(function(input, output, session) {
          p1 <- p1 + geom_point(data = planets[s1,],aes(`Right Ascension (decimal degrees)`, `Declination (decimal degrees)`), col = 'red',shape = 'triangle', inherit.aes = F, size =2.5)
      }
   
-      p1
+      p1 
         
     })
     
-    output$celestial <- renderPlot({      #2/2
+    output$celestial <- renderPlotly({      #2/2
         
         
-g <- ggplot(x, aes()) + geom_sf(col= 'lightblue', size = 0.5, alpha = 0.5)  +
+g <- ggplot(x2, aes()) +
+  geom_sf(data = x2, aes(label = Planet), col= 'lightblue', size = 0.5, alpha = 0.5) +
   geom_sf(data = milky_sf_trans, alpha = 0.3, aes(fill = id)) + 
   scale_fill_grey() + 
   geom_sf(data = stars_bright_sf, col = 'red', 
-          aes(size=stars_bright_sf$newmag, text=paste('</br>Name: ',name,'</br>Stellar Magnitude: ',mag,'</br>Constellation: ',con))) +
-  geom_sf(data = constellations_sf, col = 'lightgrey', apha = 0.2) +
-  ggsflabel::geom_sf_text_repel(data= stars_bright_sf,
-                                aes(label=stars_bright_sf$name),
-                                nudge_x = -2, 
-                                colour="Yellow",
-                                size= 5) + 
-  ggsflabel::geom_sf_text_repel(data= constellations_sf,
-                                aes(label=constellations_sf$id),
-                                nudge_x = -1, 
-                                size = 4,
-                                colour="white") +
+          aes(size=stars_bright_sf$newmag, text= paste('</br>Name: ',name,'</br>Stellar Magnitude: ',mag,'</br>Constellation: ',con))) +
+  geom_sf(data = constellations_sf, col = 'lightgrey', apha = 0.2, aes(label = Constellation)) +
+  geom_sf_text(data = constellations_sf, aes(label = constellations_sf$Constellation), col = 'orange' ) +
   xlab("") + ylab("") +
   theme_nightsky() 
+
+
+
+g %>%
+  ggplotly(tooltip = c('label', 'text')) %>%
+  layout(height = 800)
      
-        grob <- ggplotGrob(g)
-        grob$respect <- FALSE
-        grid.newpage()
-        grid.draw(grob)
         
     })
     
@@ -219,8 +216,7 @@ g <- ggplot(x, aes()) + geom_sf(col= 'lightblue', size = 0.5, alpha = 0.5)  +
        
    # Data table for Astro Map tab.
       
-        DT::datatable(selectedData(), style = 'bootstrap', options = list(pageLength = 15),rownames = T)  %>%
-            formatStyle(names(selectedData()), color = 'white')
+        DT::datatable(selectedData(), style = 'bootstrap', options = list(pageLength = 5),rownames = F)
     })
     
     ranges2 <- reactiveValues(x = NULL, y = NULL)
@@ -338,31 +334,53 @@ options(scipen = 999)
    
     ### Plot logic. 
     
+    # Scatter Plot 
+    
     output$dotplot <- renderPlot({
       
       keep <- planets[vals$keeprows, , drop = F]
       exclude <- planets[!vals$keeprows, , drop = F]
       
-      grob3 <- grobTree(textGrob(paste("Pearson Correlation : ", round(cor(x = keep[input$xcolumn], y = keep[input$ycolumn],  use = "complete.obs"), 4) ), x = 0.63, y = 0.97, hjust = 0, gp = gpar(col = "red", fontsize = 11, fontface = "bold")))
       
-        a <- ggplot(data = keep, aes_string(x = as.name(input$xcolumn), y = as.name(input$ycolumn))) +
+      # Apply filter by year of discovery
+      
+      keep$`Year of Discovery` <- as.numeric(as.character(keep$`Year of Discovery`))
+      keep <- keep %>%
+        filter(`Year of Discovery` <= input$year[2],
+               `Year of Discovery` >= input$year[1])
+      
+      keep <- keep %>%
+        filter(`Discovery Method` %in% input$disc_method)
+      
+      # Pearson Correlation info
+      
+      grob3 <- grobTree(textGrob(paste("R = ", round(cor(x = keep[input$xcolumn], y = keep[input$ycolumn],  use = 'na.or.complete'), 4) ), x = 0.60, y = 0.95, hjust = 0 ,gp = gpar(col = "red", fontsize = 11, fontface = "bold")))
+      
+ 
+      # Main plot 
+      
+        a <- ggplot(data = filter(na.omit(keep[,c(input$x_col, input$ycolumn, input$xcolumn,input$color, "Planet Name", "Discovery Method", "Year of Discovery")])), 
+                    aes_string(x = as.name(input$xcolumn), y = as.name(input$ycolumn))) +
           geom_point() +
           geom_point(data = exclude, fill = NA, shape = 21, alpha = 0.2) +
           labs(title = paste(as.name(input$ycolumn), "vs.", as.name(input$xcolumn), sep = " ")) +
-          theme_economist() +
-          theme(axis.title = element_text(size = 12, vjust = 1), plot.title = element_text(size = 16, vjust = 1), legend.text = element_text(size = 9)) +
-          annotation_custom(grob3)
+          theme_gdocs() +
+          theme(axis.title = element_text(size = 12, vjust = 1), plot.title = element_text(size = 16, vjust = 1), legend.text = element_text(size = 9),
+                legend.position = 'right')
           
 
-        
         # Global Options
         
       if (input$color != 'None')
-        a <- a + aes_string(color= as.name(input$color))
+        a <- a + aes_string(color = as.name(input$color))
+        
+        if (input$color == 'None')
+          a <- a + theme(axis.title = element_text(size = 12, vjust = 1), plot.title = element_text(size = 16, vjust = 1), legend.text = element_text(size = 9),
+                legend.position = 'none')
       
       if (input$color == 'Discovery Method')
-        a <- a + aes_string(color = as.name(input$color)) + scale_color_manual(values = c("grey","black","brown", "orange", "green", "darkgreen", 
-                                                                                          "yellow", "red",'blue', "purple"))
+        a <- a + aes_string(color = as.name(input$color)) + scale_color_manual(values = c("#ff0000","#f79292","#b05cfa","#387bab", "#64ab2b", "#2e6601", 
+                                                                                          "#37ada2", "#05dbf2","#ffd88a", "#f2a200",'#f0a5e2'))
       
       if (input$smooth)
         a <- a + geom_smooth(method = 'lm', se = F, col =  'orange', fullrange = F, formula = y ~ x)
@@ -375,11 +393,19 @@ options(scipen = 999)
       
       if(input$scale_y)
         a <- a + scale_y_log10()
+        
+      if(input$facet)
+        a <- a + facet_wrap(~`Discovery Method`, drop = T)
+        
+      if(input$corr)
+      a <- a + annotation_custom(grob3)
+
+       if(input$facet && input$color == "Discovery Method")
+       a <- a + facet_wrap(~`Discovery Method`, drop = T) + theme(legend.position = 'none')
+        
       
-   
         # Print Plot
       a
-      
       
     })
     
@@ -411,75 +437,160 @@ options(scipen = 999)
     
     # Data table containing double click point info. 
     
-    output$hoverinfo <- DT::renderDataTable({
+    output$clickinfo <- DT::renderDataTable({
       
       DT::datatable(nearPoints(na.omit(planets[c("Planet Name", "Discovery Method", "Discovery Facility", input$xcolumn, input$ycolumn)]), 
-                 input$plot_click1, threshold = input$max_distance, maxpoints = input$max_points), style = 'bootstrap')
+                 input$plot_click1, threshold = input$max_distance, maxpoints = input$max_points), filter = 'bottom', caption = 'Clicked Points Table',
+                 style = 'bootstrap', extensions = c('Responsive', 'Scroller'), options = list(pageLength = 5, sDom  = '<"top">flrt<"bottom">ip',
+                                                                                deferRender = TRUE,
+                                                                                scrollY = 200,
+                                                                                scroller = TRUE))
       
     })
     
     output$brushinfo <- DT::renderDataTable({
       
       DT::datatable(brushedPoints(na.omit(planets[c("Planet Name", "Discovery Method", "Discovery Facility", input$xcolumn, input$ycolumn)]),
-                                  input$plot_brush1, xvar = input$xcolumn, yvar = input$ycolumn), style = 'bootstrap')
+                                  input$plot_brush1, xvar = input$xcolumn, yvar = input$ycolumn), filter = 'bottom', caption = 'Brushed Points Table' ,
+                    style = 'bootstrap', extensions = c('Responsive', 'Scroller'),options = list(pageLength = 5, sDom  = '<"top">flrt<"bottom">ip',
+                                                                                                 deferRender = TRUE,
+                                                                                                 scrollY = 200,
+                                                                                                 scroller = TRUE))
     })
     
+
+    #######################
+    #     Box plots       #
+    #######################
     
-    
-    ### Box plots
+    # First boxplot contains data brushed in the scatter plot, i.e. selectedInfo().
     
     selectedInfo <- reactive({
       
-      data <- brushedPoints(planets, input$plot_brush1)
+      data <- brushedPoints(na.omit(planets[,c(input$x_col, input$ycolumn, input$xcolumn, "Planet Name", "Discovery Method", "Year of Discovery")]), input$plot_brush1)
       
       if (nrow(data) == 0)
-        data <- planets
+        data <- na.omit(planets[,c(input$x_col, input$ycolumn, input$xcolumn, "Planet Name", "Discovery Method", "Year of Discovery")])
       
-  data
-  
+      # Filtering options: 
+      
+      data$`Year of Discovery` <- as.numeric(as.character(data$`Year of Discovery`))
+      data <- data %>%
+        filter(`Year of Discovery` <= input$year[2],
+               `Year of Discovery` >= input$year[1])
+      
+      data <- data %>%
+        filter(`Discovery Method` %in% input$disc_method)
+      
+      
+      data
+      
+    })
+   
+    # First box plot. Response variable is the same as in the scatter plot. 
+    
+    output$boxplot1 <- renderPlotly({
+      
+      
+      # Plot logic
+      
+      b <- ggplot(filter(selectedInfo(), `Discovery Method` != "NA"), aes_string(x = as.name(input$x_col) , y = as.name(input$ycolumn), fill = as.name(input$x_col),
+                                                                                 label = as.name('Planet Name'))) + 
+        geom_boxplot() +
+        scale_fill_manual(values = c("#ff0000","#f79292","#b05cfa","#387bab", "#64ab2b", "#2e6601", 
+                                     "#37ada2", "#05dbf2","#ffd88a", "#f2a200",'#f0a5e2')) +
+        geom_point(shape = 21) +
+        ggtitle(paste(input$ycolumn, "-", input$x_col, "Distribution", sep =" ")) +
+        theme_gdocs() +
+        theme(axis.title = element_text(size = 12, vjust = 1), legend.position = 'none', axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+              plot.title = element_text(size = 15, colour = '#4979ab')) 
+      
+      
+      #  Graph Options
+      
+      if(input$logbox) {
+        b <- b + scale_y_log10()
+        b %>%
+          ggplotly(tooltip = c('y', "label"))
+      }
+      else{
+      b %>%
+        ggplotly(tooltip = c('y', "label"))
+      }
+      
+      if(input$coord_flip) {
+        b <- b + coord_flip()
+        b %>%
+          ggplotly(tooltip = c('y', 'label'))
+      }
+      else {
+        
+        b %>%
+          ggplotly(tooltip = c('y', "label"))
+      }
+    
+      
     })
     
- 
-    output$boxplots <- renderPlot({
-      
-       ggplot(filter(selectedInfo(), `Discovery Method` != "NA", !is.na(input$xcol)), aes_string(x = as.name(input$x_col) , y = as.name(input$ycolumn), fill = as.name(input$x_col))) + 
-       geom_boxplot() +
-        scale_fill_manual(values = c("grey","black","brown", "orange", "green", "darkgreen", 
-                                      "yellow", "red",'blue', "purple")) +
-       geom_point(shape = 21) +
-       theme_wsj() +
-       theme(axis.title = element_text(size = 10, vjust = 1), legend.position = 'none', axis.text.x = element_text(angle = 45, hjust = 1))  +
-       ylab(as.name(input$ycolumn)) + xlab(as.name(input$x_col))
-      
+
+    # The second boxplot contains the data from the scatter plot before and after the exclusion of points. The response variable corresponds to the x-axis of the scatter plot.
     
+    output$boxplot2 <- renderPlotly({
+      
+      
+      # Transformation function for axis values (2 decimal places).
+      
+      scaleFUN <- function(x) sprintf("%.2f", x)
+      
+      keep <- planets[vals$keeprows, , drop = F]
+      
+      # Applying filters:
+      keep$`Year of Discovery` <- as.numeric(as.character(keep$`Year of Discovery`))
+      keep <- keep %>%
+        filter(`Year of Discovery` <= input$year[2],
+               `Year of Discovery` >= input$year[1])
+      
+      keep <- keep %>%
+        filter(`Discovery Method` %in% input$disc_method)
+      
+      # Plot logic
+      
+     c <- ggplot(data = filter(na.omit(keep[,c(input$x_col2, input$ycolumn, input$xcolumn, "Planet Name", "Discovery Method", "Year of Discovery")]), `Discovery Method` != "NA"), 
+                 aes_string(x = as.name(input$x_col2) , y = as.name(input$xcolumn), fill = as.name(input$x_col2), label = as.name('Planet Name'))) + 
+        geom_boxplot() +
+        scale_fill_manual(values = c("#ff0000","#f79292","#b05cfa","#387bab", "#64ab2b", "#2e6601", 
+                                     "#37ada2", "#05dbf2","#ffd88a", "#f2a200",'#f0a5e2')) +
+        geom_point(shape = 21, label = as.name("Planet Name")) +
+        theme_gdocs() +
+       ggtitle(paste(input$xcolumn, '-', input$x_col2, 'Distribution',sep =" ")) +
+        theme(axis.title = element_text(size = 12, vjust = 1), legend.position = 'none', axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+              plot.title = element_text(size = 15,  colour = '#4979ab'))
+       
+      
+     # Options
+      
+     if(input$logbox2) {
+       c <- c + scale_y_log10()
+       c %>%
+         ggplotly(tooltip = c('y', "label"))
+     }
+     else{
+       c %>%
+         ggplotly(tooltip = c('y', "label"))
+     }
+     
+     if(input$coord_flip2) {
+       c <- c + coord_flip()
+       c %>%
+         ggplotly(tooltip = c('y', 'label'))
+     }
+     else {
+       
+       c %>%
+         ggplotly(tooltip = c('y', "label"))
+     }
+      
     })
-    
-    
-    # Outlier Removal: Remove outliers by selecting points in box plot. The selected points will be excluded in the correlation plot. 
-    
-    observeEvent(input$plot_brush2, {
-      res <- brushedPoints(planets, input$plot_brush2, allRows = TRUE)
-      
-      vals$keeprows <- xor(vals$keeprows, res$selected_)
-    })
-    
-    # Show brushed points in box plots in table
-    
-    output$box_brushinfo <- DT::renderDataTable({
-      
-      DT::datatable(brushedPoints(na.omit(planets[c("Planet Name", "Discovery Method", "Discovery Facility", input$x_col, input$ycolumn)]),
-                                  input$plot_brush2, xvar = input$x_col, yvar = input$ycolumn), style = 'bootstrap')
-    })
-    
-    # Show box plot hover info in table 
-    
-    output$box_near_point_info <- DT::renderDataTable({
-      
-      DT::datatable(nearPoints(na.omit(planets[c("Planet Name", "Discovery Method", "Discovery Facility", input$x_col, input$ycolumn)]),
-                                  input$boxplot_hover), style = 'bootstrap', options = list(dom = 't'))
-    })
-    
-    
     
     
 ###################################################################################################################
@@ -575,7 +686,6 @@ options(scipen = 999)
                      paste(tags$strong("Number of Planets Discovered: "), qsub()$`Discovered Planets`, sep = ""),
                      paste(tags$strong("Discovery Methods: "), qsub()$`Discovery Methods`, sep = ""),
                      paste(tags$strong("Techniques used: "), paste(unique(planets$`Discovery Method`[planets$`Discovery Facility` == qsub()$`Discovery Facility`]), collapse= ", "), sep = ""),
-                     paste(tags$strong("test: "), print(class(qsub()$`Discovery Facility`)), sep = ""),
                      sep = '<br/>')) %>%
         setView(lng = -93.85, lat = 37.45, zoom = 4)
       
@@ -699,6 +809,7 @@ function(el, x) {
                          condition = sprintf("input.radio%d=='histogram'",i),
                          sliderInput(paste0("slider",i), "Number of bins",
                                      min = 5, max = 100, value = 30)
+                         
                        ))
               )
             },
@@ -723,37 +834,51 @@ function(el, x) {
                 if(input[[paste0('chkbox',ii)]])
                   pp + scale_x_log10()
               }else{
-                ggplot(qsub(), aes_string(as.name(names(qsub())[ii]))) + 
+                hist <- ggplot(qsub(), aes_string(as.name(names(qsub())[ii]))) + 
                   geom_histogram(bins = input[[paste0("slider",ii)]]) + 
                   theme_bw() + theme(axis.title = element_text(size = 16))
+                print(hist)
+                if(input[[paste0('chkbox',ii)]])
+                  hist + scale_x_log10()
               }
             }else{
              
-              ggplot(qsub(), aes_string(as.name(names(qsub())[ii]))) + geom_bar() + 
+              hist2 <- ggplot(qsub(), aes_string(as.name(names(qsub())[ii]))) + geom_bar() + 
                 geom_text(stat="count", aes(label=..count..), vjust=-0.5) + 
                 xlab(names(qsub())[ii]) + theme_bw()
-             
+              print(hist2)
+              
             }
           
           })
           
         })
       }
-
     
-  
-
- 
- ########
-    
-    #TEST
-    
-      output$tt <- renderDataTable({
+#########
+      
+      output$test4 <- renderPlotly({
+        planets3 <- planets %>%
+          select(disc = `Year of Discovery`, pl_name = `Planet Name`, method = `Discovery Method`)
         
-        DT::datatable(test)
+      
+        gb <- planets3 %>%
+          select(Year = disc) %>%
+          group_by(Year) %>%
+          summarize(`Number of Planets Discovered` = n())
+        
+        
+        
+        ggplotly(ggplot(gb, aes(as.integer(Year), `Number of Planets Discovered`, label = Year)) + 
+                   geom_area(fill = '#258f5a') + 
+                   scale_x_continuous(breaks = c(1:28), labels = c(1989, 1992, 1994:2019)) +
+                   
+                   xlab("Year") + ggtitle("Yearly Exoplanet Discoveries") +
+                   theme_economist() +
+                   theme(axis.text = element_text(angle = 90)),
+                 tooltip = c('label', 'y'))
+        
+       
+        
       })
-    
-    
-
-    
 })

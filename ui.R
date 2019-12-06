@@ -1,17 +1,4 @@
 library(shiny)
-library(plotly)
-library(shinythemes)
-library(shinyWidgets)
-library(htmlwidgets)
-library(htmltools)
-library(shinydashboard)
-library(tidyverse)
-library(leaflet)
-library(queryBuilder)
-library(jsonlite)
-library(shinyjs)
-library(shinyBS)
-
 
 
 # Define UI for application
@@ -76,7 +63,7 @@ shinyUI(
         };
     "))),
              tags$style(".navbar {
-                         background: #4979ab; width:100%; border:2px solid; border-color:#436e9c}
+                         background: #4979ab; border:2px solid; border-color:#436e9c; padding-right:0px;}
                        "),
             sidebarLayout(position = 'right', 
                 sidebarPanel(
@@ -85,24 +72,18 @@ shinyUI(
                     p(h3("Number of Confirmed Exoplanets: ",tags$strong(nrow(planets)), style = 'color:white;')),
                     p(h3("Number of Host Stars: ", tags$strong(n_distinct(planets$`Planet Hostname`)), style = 'color:white;')),
                     hr(style = 'border-color:white;'),
-                    selectInput("var1", choices = names(select(planets, -`Discovery Method`, -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`)), selected = 'Orbit Semi-Major Axis (AU)',label = h3('Summary Statistics', style = 'color:white;')),
+                    selectInput("var1", choices = names(select(planets, -`Discovery Method`, -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`)), selected = 'Orbit Semi-Major Axis (AU)',label = h3('Confirmed Planets - Summary Statistics', style = 'color:white;')),
                     wellPanel(verbatimTextOutput('planetary_summary'), height = 200, style = 'background-color:#258f5a;'),
-                    tags$hr(style = 'border-color: white;'),
-                    p(h2("Acknowledgement", style = "color:white;"),"The research for this web app has made use of the NASA Exoplanet Archive, which is operated by the California Institute of Technology, under contract with the National Aeronautics and Space Administration under the Exoplanet Exploration Program."),
-                    br(),
-                    p(
-                      "This web application also makes use of data from the first public release of the WASP data (Butters et al. 2010) as provided by the WASP consortium and services at the NASA Exoplanet Archive."),
-                    br(),
-                    p("KELT data are made available to the community through the Exoplanet Archive on behalf of the KELT project team.")
-                   
-                    
+                    tags$hr(style = 'border-color: white;')
+  
                 ),
+                
                 mainPanel(
                     tabsetPanel(type = c("tabs"),
                   tabPanel("Background", 
                            br(),
                            
-                           column(12, 
+                           fluidRow(column(12, 
                                   wellPanel(
                                     p(
                   "At the present day, the progress we've made in the way we understand science, coupled with advances in technological means, have accelerated the global momentum towards space exploration and the search for extra-solar worlds.
@@ -111,11 +92,15 @@ shinyUI(
                   planetary system foreign to our own."), style = 'padding:1px;')),
                   br(),
                 
-                  column(8,wellPanel(p("The launch of the Kepler Space Telescope has revolutionized space exploration by means of photometric techniques to observe hundreds of thousands of stars. The Kepler mission (May 2009 through May 2013), which aimed to discover
-                  Earth-sized planets located within the habitable zone of Solar-like systems has led to the discovery of thousands of transiting exoplanets, in addition to numerous planet candidates."), style = 'padding: 5px;')),
-                  column(8, wellPanel(tags$img(src = "https://upload.wikimedia.org/wikipedia/commons/f/f0/Animation_of_Kepler_trajectory.gif", align = 'center', width = '600px', height = '400px'), style = 'padding:10px; width:620px;')),
+                  column(8,wellPanel(p("The launch of the Kepler Space Telescope has revolutionized space exploration by means of photometric techniques to observe hundreds of thousands of stars. The", tags$a(tags$strong('Kepler mission'),
+                  href = 'https://exoplanets.nasa.gov/resources/2192/nasas-kepler-mission-by-the-numbers/', target = '_blank'), "(May 2009 through November 2018), which aimed to discover
+                  Earth-sized planets located within the habitable zone of Solar-like systems has led to the discovery of thousands of transiting exoplanets, in addition to numerous planet candidates."), style = 'padding: 5px;'))),
+                  fluidRow(column(6, wellPanel(tags$img(src = "https://upload.wikimedia.org/wikipedia/commons/f/f0/Animation_of_Kepler_trajectory.gif", align = 'center', width = '470px', height = '300px'), style = 'padding:10px; width:490px;height:310')),
+                           column(6,
+                           div(style = "display: inline-block;vertical-align:top;", wellPanel(plotlyOutput("test4", height = 300, width = 470), style = 'background-color:#4979ab; padding:10px;width:490;height:310')))),
+              
            
-                    column(8,wellPanel(p("This open source web app allows users to explore and interact with data from the Exoplanet Archive as well as from a few additional sources."), style = 'padding:5px;'))),
+                    fluidRow(column(12,wellPanel(p("This open source web app allows users to explore and interact with data from the Exoplanet Archive as well as from a few additional sources."), style = 'padding:5px;')))),
                         tabPanel("Data",
                                  br(),
                                  p("The interactive tables display data stored in the", (tags$a(tags$strong("Exoplanet Archive"), href = "https://exoplanetarchive.ipac.caltech.edu/", target = "_blank")),
@@ -164,7 +149,36 @@ shinyUI(
                                           wellPanel(tags$a(tags$strong(tags$h5("Quick guide for using the Query Builder")), onclick = "fakeClick('Query Builder')"),
                                                     tags$video(src = 'query_builder_how_to.mov',  autoplay = T, controls = T, width = '750px', height = '600px'), width = '100%',
                                                     style = 'padding:0px;width: 770px; background-color:black;')))),
+                  
+                  ##
+                  
+                  tabPanel("Exploratory Graphs",
+                           br(),
+                           wellPanel(tags$a(h4("Plot Section"), onclick = "fakeClick('Correlation')"), 
+                                     p("Interactive plots that allow you to visualize relationships between planetary and/or stellar parameters."), 
+                                     tags$hr(style = 'border-color:white;'),
+                                     tags$img(src = "CorrelationExample.png", height = '400px', width = '700px'),
+                                     tags$h6("figure 1. How planet radius behaves as a function of the Orbit Semi-Major axis length."),
+                                     align = 'center', width = '100%', style = 'padding:10px; width:720px',
+                                     p(br(), "These plots are generated from measurements extracted from the Confirmed Planets Table. Plot types include:"),
+                                     p(
+                                       tags$ul(
+                                         tags$li("Correlation graphs (figure 1) to show the relationship between two numerical variables;"), 
+                                         tags$li("Histograms and density plots to visualize variable distribution;"),
+                                         tags$li("Box plots for depicting groups of numerical data through their quartiles.")
+                                       )))),
+                  
+                  ##
+                  
+                  tabPanel("Observatories",
+                           tags$br(),
+                           br(),
+                           wellPanel(tags$a(tags$strong(tags$h5("Tips for navigating the observatories interface")), onclick = "fakeClick('Observatories')"),
+                                     tags$video(src = 'observatories_how_to_480.mov',  autoplay = T, controls = T, width = '750px', height = '600px'), width = '100%',
+                                     style = 'padding:0px;width: 770px; background-color:black;')),
                         
+                  ##
+                  
                         tabPanel("Light Curves",
                                  br(),
                                  tabsetPanel(type = c("tabs"),
@@ -194,9 +208,11 @@ shinyUI(
                                             style = 'padding:10px; width:720px;', align = 'center'
                                           )))),
                         
+                  ##
+                  
                         tabPanel("Identifying Exoplanets",
                                  br(),
-                                 tags$h3("Using the Keras and Tensorflow libraries for vetting transiting planet candidates"),
+                                 tags$h3("Using the Keras and Tensorflow libraries for vetting transiting planet candidates (More Coming Soon)"),
                                  
                                  tags$style("h3{color: #4979ab;
                                  font-size: 15px;
@@ -207,28 +223,8 @@ shinyUI(
                                  wellPanel(p("Among the recently developed techniques to facilitate the search for extra-solar planets (Exoplanets), deep learning has emerged as a promising tool."),
                                  p("In this section, we will train a model using Keras combined with a Tensorflow backend to assess the likelihood that a given candidate is indeed a planet."),
                                  p("Ideally, the model should be designed in such a way that it becomes able to discriminate between a transiting exoplanet and a false positive such as 
-                                   eclipsing binaries, instrumental artifacts and stellar variability (Shallue & Vanderburg 2018)."))),
-                        tabPanel("Exploratory Graphs",
-                                 br(),
-                                 wellPanel(tags$a(h4("Plot Section"), onclick = "fakeClick('Correlation')"), 
-                                           p("Interactive plots that allow you to visualize relationships between planetary and/or stellar parameters."), 
-                                           tags$hr(style = 'border-color:white;'),
-                                                                           tags$img(src = "CorrelationExample.png", height = '400px', width = '700px'),
-                                   tags$h6("figure 1. How planet radius behaves as a function of the Orbit Semi-Major axis length."),
-                                   align = 'center', width = '100%', style = 'padding:10px; width:720px',
-                                   p(br(), "These plots are generated from measurements extracted from the Confirmed Planets Table. Plot types include:"),
-                                   p(
-                                     tags$ul(
-                                     tags$li("Correlation graphs (figure 1) to show the relationship between two numerical variables;"), 
-                                     tags$li("Histograms and density plots to visualize variable distribution;"),
-                                     tags$li("Box plots for depicting groups of numerical data through their quartiles.")
-                                           )))),
-                        tabPanel("Observatories",
-                                 tags$br(),
-                                 br(),
-                                 wellPanel(tags$a(tags$strong(tags$h5("Tips for navigating the observatories interface")), onclick = "fakeClick('Observatories')"),
-                                   tags$video(src = 'observatories_how_to_480.mov',  autoplay = T, controls = T, width = '750px', height = '600px'), width = '100%',
-                                           style = 'padding:0px;width: 770px; background-color:black;'))
+                                   eclipsing binaries, instrumental artifacts and stellar variability (Shallue & Vanderburg 2018).")))
+                       
                         
                     )
                 )
@@ -262,10 +258,10 @@ shinyUI(
                  tags$style(HTML('table.dataTable th {background-color: #3a3f44 !important;}')),
                  
                  
-                 div(style = "display: inline-block;vertical-align:top;", downloadButton("download","Download as csv")),
+                 div(style = "display: inline-block;vertical-align:top;"),
                  div(style ="display: inline-block;vertical-align:top; width: 450px", HTML("<br>")),
-                 div(style = "display: inline-block;vertical-align:top;", wellPanel(p(tags$a("Column definitions can be found at the NASA Exoplanet Archive", 
-                                                                                             href = "https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html", target = "_blank")))),
+                wellPanel(p(tags$a("Column definitions", 
+                                                                                             href = "https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html", target = "_blank")), align = 'right', width = '250px'),
                  DT::dataTableOutput("planets", width = '100%'))))),
              
                          tabPanel(
@@ -293,7 +289,7 @@ shinyUI(
                       fluidPage(
                         fluidRow(
                           br(),
-                          column(6, br(), queryBuilderOutput('querybuilder', width = 800, height = 300)),
+                          column(6, h5("Text values are case sensitive!", style = 'color:red;'), queryBuilderOutput('querybuilder', width = 'auto', height = '325')),
                           column(6, uiOutput('txtValidation'), align = 'right', uiOutput('txtFilterText'), verbatimTextOutput('txtSQL')), style = 'height:200px;'),
                     hr(),
                         fluidRow(column(12,DT::dataTableOutput('dt', width = '800px', height = '600px'), align = 'center'), style = 'padding:10px;')
@@ -307,13 +303,21 @@ shinyUI(
 ##                                          EXPLORATORY GRAPHS                                                   ## 
 ###################################################################################################################
 
-navbarMenu("Exploratory Graphs", icon = icon("chart-area"),
+navbarMenu("Exploratory Graphs", icon = icon("chart-line"),
            
            tabPanel("Correlation",  
                     div(style = 'margin-bottom: -30px;'),
                     class = 'img_',
                     div(style = "padding: 20px !important;"),
                     fluidRow(
+                      
+                      column(3,
+                             DT::dataTableOutput("clickinfo", width = '100%'), hr(style = 'border-color:white;'), 
+                             wellPanel(h3("Filter", style = 'color:white; font-size = 14px; font-style:bold;'),
+                                       selectizeInput(inputId = 'disc_method', "Discovery Method", choices = planets$`Discovery Method`, multiple = T, 
+                                                      selected = planets$`Discovery Method`),
+                                       style = 'padding:5px;')),
+                      
                       column(6,
                             wellPanel(
                               tags$div(style = "display: inline-block;vertical-align:top;", 
@@ -324,20 +328,20 @@ navbarMenu("Exploratory Graphs", icon = icon("chart-area"),
                                          
                                 tags$h4("Graph Options"),
                                 
-                                selectInput('xcolumn', "X-Axis", choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -`Planet Hostname`)), 
+                                selectInput('xcolumn', "Explanatory Variable (X)", choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -`Planet Hostname`)), 
                                             selected = "Planet Radius (Jupiter radii)"),
                                 
                                 prettyCheckbox(inputId = "scale_x", label = "Logarithmic Scale", icon = icon("check"), animation = 'pulse', value = T),
                                 
-                                hr(),
+                                hr(style = 'border-color:white;'),
                                 
-                                selectInput('ycolumn', 'Y-Axis', choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`,
+                                selectInput('ycolumn', 'Response Variable (Y)', choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`,
                                                                                                            -`Declination (sexagesimal)`, -`Planet Hostname`)), 
-                                            selected = "Planet Mass or M*sin(i) [Jupiter mass]"),
+                                            selected = "Planet Density (g/cm**3)"),
                                 
                                 prettyCheckbox(inputId = "scale_y", label = "Logarithmic Scale", icon = icon("check"), animation = 'pulse', value = T),
                                 
-                                hr(),
+                                hr(style = 'border-color:white;'),
                                 
                                 selectInput('color', 'Color', choices = c('None', names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'),
                                                                                                                   `Discovery Method`,-`Planet Name`, 
@@ -345,13 +349,16 @@ navbarMenu("Exploratory Graphs", icon = icon("chart-area"),
                                                                                                                   -`Planet Hostname`))),
                                             selected = 'Discovery Method'),
                                 
-                                hr(),
+                                hr(style = 'border-color:white;'),
                                 
                                 materialSwitch(inputId = "smooth", label = "Linear Smoothing", status = 'primary', value = T),
                                 materialSwitch(inputId = 'loess', label = "Lowess Smoothing", status = 'primary'),
+                                hr(style = 'border-color:white;'),
+                                prettyCheckbox(inputId = 'facet', label = 'Facet', status = 'primary', value = F, icon = icon('check'), animation = 'pulse'),
+                                prettyCheckbox(inputId = 'corr', label = 'Pearson Correlation Coefficient', status = 'primary', value = F, icon = icon('check'), animation = 'pulse'),
                                 
                                 status = 'success', icon = icon('gear'),
-                                tooltip = tooltipOptions(title = 'Global Options'), style = 'color:blue;')),
+                                tooltip = tooltipOptions(title = 'Global Options'))),
                                 div(style = "display: inline-block;vertical-align:top;width: 250px; align = 'center", HTML('<br>')),
                                 div(style = "display: inline-block;vertical-align:top;", h4("Correlation Plot")),
                                
@@ -365,43 +372,61 @@ navbarMenu("Exploratory Graphs", icon = icon("chart-area"),
                              
                              br(),
                              
-                             actionBttn("exclude_toggle", "Exclude Brushed Points", style = 'float'), actionBttn("reset_plot", "Reset", style = 'float')),
+                             wellPanel(actionBttn("exclude_toggle", "Exclude Brushed Points", style = 'float'), actionBttn("reset_plot", "Reset", style = 'float'),
+                            
+                            
+                            div(style = "display: inline-block;vertical-align:top;width: 25px; align = 'center", HTML('<br>')),
+                            div(style = "display: inline-block;vertical-align:top;", sliderInput("max_distance", "Max distance (pixels)",
+                                                                                                min=1, max=20, value=5, step=1, width = '200px')),
+
+                            div(style = "display: inline-block;vertical-align:top;width: 10px; align = 'center", HTML('<br>')),
+                            div(style = "display: inline-block;vertical-align:top;", sliderInput("max_points", "Max number of rows to select",
+                                                                                                  min=1, max = 50, value=5, step=1, width = '200px')),
+                            style = 'background-color:#7774a6;'
+                                  
+                           )),
                       
-                      column(6, 
-                             wellPanel(div(style = "display: inline-block;vertical-align:top;", shinyWidgets::dropdownButton(
-                        tags$h4("BoxPlot Options"),
-                        selectInput('x_col', "X-Axis", choices = names(planets %>% dplyr::select(which(sapply(.,class) %in% c('integer', 'character', 'factor')), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -`Planet Hostname`)), 
-                                    selected = "Discovery Method"),status = 'success', icon = icon('gear'),
-                        tooltip = tooltipOptions(title = 'Global Options'))),
-                        div(style = "display: inline-block;vertical-align:top;width: 250px; align = 'center", HTML('<br>')),
-                        div(style = "display: inline-block;vertical-align:top;", h4("Distribution - Box Plot")),
-                        tags$hr(style="border-color: white;"),
-                        plotOutput('boxplots',brush = brushOpts(id = "plot_brush2"), hover = hoverOpts(id = "boxplot_hover")),  style = 'border: 4px solid; border-color:#4979ab;'))),
+                 
+                      
+                             column(3,DT::dataTableOutput("brushinfo", width = '100%'), hr(style = 'border-color:white;'),
+                                    wellPanel(h3("Filter", style = 'color:white; font-size = 14px; font-style:bold;'),
+                                                         sliderInput('year', "Year of Discovery", min = 1989, max = 2019, value = c(1989, 2019), sep = ""),
+                                              style = 'padding:5px;'))
+                      
+                     ),
                     tags$hr(style="border-color: white;"),
                     
                     fluidRow(
                       
+                    
                       column(6, 
-                             wellPanel(
-                               div(class = "option-group",
-                                   h4("Near-Point Options"),
-                                   hr(),
-                                   flowLayout(
-                                     sliderInput("max_distance", "Max distance (pixels)",
-                                                 min=1, max=20, value=5, step=1),
-                                     sliderInput("max_points", "Max number of rows to select",
-                                                 min=1, max = 50, value=5, step=1)
-                                   ),
-                                   DT::dataTableOutput("hoverinfo"))),
-                             br(),
-                             wellPanel(DT::dataTableOutput("brushinfo"))),
-                      column(6, 
-                             wellPanel(h4("Hover Points"),
-                                       hr(),
-                                       DT::dataTableOutput("box_near_point_info")),
-                             br(),
-                             wellPanel(DT::dataTableOutput("box_brushinfo"))))),
-           
+                             wellPanel(div(style = "display: inline-block;vertical-align:top;", 
+                                           shinyWidgets::dropdownButton(
+                               tags$h4("BoxPlot Options"),
+                               selectInput('x_col', "Explanatory Variable (X)", choices = names(planets %>% dplyr::select(which(sapply(.,class) %in% c('integer', 'character', 'factor')), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -`Planet Hostname`)), 
+                                           selected = "Discovery Method"),status = 'success', icon = icon('gear'),
+                               tooltip = tooltipOptions(title = 'Global Options'),
+                               prettyCheckbox('logbox', 'Log Scale for Y Axis', value = F, animation = 'pulse', status = 'success', icon = icon('check')),
+                               prettyCheckbox('coord_flip', "Flip Coordinates", value = F, icon = icon('check'), animation = 'pulse', status = 'primary'))),
+                               div(style = "display: inline-block;vertical-align:top;width: 250px; align = 'center", HTML('<br>')),
+                               div(style = "display: inline-block;vertical-align:top;", h4("Box Plot")),
+                               tags$hr(style="border-color: white;"),
+                               plotlyOutput('boxplot1'),  style = 'border: 4px solid; border-color:#4979ab;')),
+                      
+                      column(6, wellPanel(div(style = "display: inline-block;vertical-align:top;", 
+                                              shinyWidgets::dropdownButton(
+                        tags$h4("Options"),
+                        selectInput('x_col2', "Explanatory Variable (X)", choices = names(planets %>% dplyr::select(which(sapply(.,class) %in% c('integer', 'character', 'factor')), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -`Planet Hostname`)), 
+                                    selected = "Discovery Method"),status = 'success', icon = icon('gear'),
+                        tooltip = tooltipOptions(title = 'Global Options'),
+                        prettyCheckbox('logbox2', 'Log Scale for Y Axis', value = F, animation = 'pulse', status = 'success', icon = icon('check')),
+                        prettyCheckbox('coord_flip2', 'Flip Coordinates', value = F, icon = icon('check'), animation = 'pulse', status = 'primary'))),
+                        div(style = "display: inline-block;vertical-align:top;width: 250px; align = 'center", HTML('<br>')),
+                        div(style = "display: inline-block;vertical-align:top;", h4("Box Plot 2")),
+                        tags$hr(style="border-color: white;"),
+                        plotlyOutput('boxplot2'),  style = 'border: 4px solid; border-color:#4979ab;')))),
+          
+   
            tabPanel("Histograms", 
                     tags$style(".navbar-default { margin : 20 !important; }"),
                     div(style = "padding: 20px !important; "),
@@ -422,24 +447,94 @@ navbarMenu("Exploratory Graphs", icon = icon("chart-area"),
            )),
 
 
+
+###################################################################################################################
+#                                                 OBSERVATORIES                                                   #
+###################################################################################################################
+
+
+
+tabPanel("Observatories", icon = icon("map-marked-alt", class = 'fas'), class = 'my_img2',
+         
+         div(style = 'margin-bottom: 10px;'),
+         tags$style(type = "text/css", "#facilities {height: calc(100vh - 80px) !important;}"),
+         div(class = 'outer'),
+         tags$head(includeCSS('style.css')),
+         
+         
+         
+         leafletOutput("facilities", width = "100%"),
+         
+         absolutePanel(id = "controls", class = "panel panel-default", fixed = F,
+                       draggable = TRUE, top = 250, left = 90, right = 'auto', bottom = "auto",
+                       width = 480, height = "auto",
+                       
+                       h2("Observatory Explorer"),
+                       tags$style(HTML('#obstable table.dataTable tr:nth-child(even) {background-color: black !important;}')),
+                       tags$style(HTML('#obstable table.dataTable tr:nth-child(odd) {background-color: white !important;}')),
+                       tags$style(HTML('#obstable table.dataTable tr:nth-child(odd) {color: black !important;}')),
+                       tags$style(HTML('#obstable table.dataTable th {background-color: white !important;}')),
+                       tags$style(HTML('#obstable table.dataTable th {color: black !important;}')),
+                       
+                       
+                       sliderInput(
+                         inputId = "pl_discovered",label = "Number of Discovered Planets", min = min(facility_coordinates$`Discovered Planets`), 
+                         max = 400, step = NULL, value = c(min(facility_coordinates$`Discovered Planets`), max(facility_coordinates$`Discovered Planets`))),
+                       shinyWidgets::prettyCheckbox("kepler", label = "Include Kepler Mission (+2,000 planets discovered)", value = T, animation = 'jelly', status = 'info'),
+                       dataTableOutput("obstable"),style = 'background-color:white;'
+         ), 
+         
+         absolutePanel(id = 'scatter_plot',
+                       
+                       shinyWidgets::dropdownButton(
+                         tags$h4("Graph Options"),
+                         
+                         selectInput('colonne_x', "Explanatory Variable (X)", choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -`Planet Hostname`)), 
+                                     selected = "Orbit Semi-Major Axis (AU)"),
+                         
+                         prettyCheckbox(inputId = "Xscale", label = "Logarithmic Scale", icon = icon("check"), animation = 'pulse', value = T),
+                         
+                         hr(),
+                         
+                         selectInput('colonne_y', 'Response Variable (Y)', choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`,
+                                                                                                                     -`Declination (sexagesimal)`, -`Planet Hostname`)), 
+                                     selected = "Planet Mass or M*sin(i) [Jupiter mass]"),
+                         
+                         prettyCheckbox(inputId = "Yscale", label = "Logarithmic Scale", icon = icon("check"), animation = 'pulse', value = T),
+                         
+                         hr(),
+                         
+                         materialSwitch(inputId = "smooth1", label = "Linear Smoothing", status = 'primary', value = F),
+                         materialSwitch(inputId = 'smooth2', label = "Lowess Smoothing", status = 'primary'),
+                         
+                         status = 'danger', icon = icon('gear'),
+                         tooltip = tooltipOptions(title = 'Global Options')),
+                       
+                       hr(style = 'border-color:white;'),
+                       fluidRow(verbatimTextOutput("Click_text")),
+                       
+                       plotlyOutput("planet_plot"),  fixed = F, draggable = F, right = 40, left = 'auto', top = 225, width = 500,  tags$head(tags$script(src="clickevent.js"))),uiOutput("modals")),
+
+
+
 ###################################################################################################################
 ##                                                  ASTROMAP                                                    ##
 ###################################################################################################################
 
 # This tab contains the AstroMap.
 
-tabPanel("AstroMap - Confirmed Planets",icon = icon('rocket') ,tags$style("body{background-color: black;}"),
+tabPanel("Celestial Map",icon = icon('globe') ,tags$style("body{background-color: black;}"),
          tags$style(".navbar-default { margin : 20 !important; }"),
          div(style = "padding: 20px !important; "),
+         tags$head(includeCSS('style.css')),
          
-            fluidPage(
-                sidebarLayout(
-                sidebarPanel(DT::dataTableOutput('tbl')),
-                
-                mainPanel(plotOutput("point", brush = brushOpts(id = "plot_brush", resetOnNew = F)), 
-                                     br(),
-                          tags$hr(style="border-color: white;"),
-                                     plotOutput('celestial', width = '1070px', brush = brushOpts(id = 'plot_brush')))))),
+         fluidPage(
+        
+                       plotlyOutput('celestial', width = '100%'))
+         
+      
+    
+         ),
 
 
 ###################################################################################################################
@@ -474,79 +569,27 @@ tabPanel("Light Curves", icon = icon('sun'),
 
 
 
-tabPanel("Dimensionality Reduction and K-means Clustering"),
+tabPanel("Dimensionality Reduction and K-means Clustering",
+         h3("Coming soon", style = 'color:white;')),
+
 
 
 ###################################################################################################################
-#                                                 OBSERVATORIES                                                   #
-###################################################################################################################
 
-
-
-tabPanel("Observatories", icon = icon("location-arrow", class = 'fas'), class = 'my_img2',
-    
-         div(style = 'margin-bottom: 10px;'),
-         tags$style(type = "text/css", "#facilities {height: calc(100vh - 80px) !important;}"),
-         div(class = 'outer'),
-         tags$head(includeCSS('style.css')),
-        
-             
-             
-             leafletOutput("facilities", width = "100%"),
+tabPanel("Sources", icon = icon('copyright'),
          
-             absolutePanel(id = "controls", class = "panel panel-default", fixed = F,
-                           draggable = TRUE, top = 250, left = 90, right = 'auto', bottom = "auto",
-                           width = 480, height = "auto",
-                           
-                           h2("Observatory Explorer"),
-                           tags$style(HTML('#obstable table.dataTable tr:nth-child(even) {background-color: black !important;}')),
-                           tags$style(HTML('#obstable table.dataTable tr:nth-child(odd) {background-color: white !important;}')),
-                           tags$style(HTML('#obstable table.dataTable tr:nth-child(odd) {color: black !important;}')),
-                           tags$style(HTML('#obstable table.dataTable th {background-color: white !important;}')),
-                           tags$style(HTML('#obstable table.dataTable th {color: black !important;}')),
-                           
+         wellPanel(p(h2("Acknowledgement", style = "color:white;"), br(),
+                     "The research for this web app has made use of the NASA Exoplanet Archive, which is operated by the California Institute of Technology, under contract with the National Aeronautics and Space Administration under the Exoplanet Exploration Program."),
+         br(),
+         p(
+           "This web application also makes use of data from the first public release of the WASP data (Butters et al. 2010) as provided by the WASP consortium and services at the NASA Exoplanet Archive."),
+         br(),
+         p("KELT data are made available to the community through the Exoplanet Archive on behalf of the KELT project team.")
+         )),
 
-                        sliderInput(
-                             inputId = "pl_discovered",label = "Number of Discovered Planets", min = min(facility_coordinates$`Discovered Planets`), 
-                             max = 400, step = NULL, value = c(min(facility_coordinates$`Discovered Planets`), max(facility_coordinates$`Discovered Planets`))),
-                             shinyWidgets::prettyCheckbox("kepler", label = "Include Kepler Mission (+2,000 planets discovered)", value = T, animation = 'jelly', status = 'info'),
-                        dataTableOutput("obstable"),style = 'background-color:white;'
-                           ), 
-         
-         absolutePanel(id = 'scatter_plot',
-                             
-                             shinyWidgets::dropdownButton(
-                               tags$h4("Graph Options"),
-                               
-                               selectInput('colonne_x', "X-Axis", choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`, -`Declination (sexagesimal)`, -`Planet Hostname`)), 
-                                           selected = "Orbit Semi-Major Axis (AU)"),
-                               
-                               prettyCheckbox(inputId = "Xscale", label = "Logarithmic Scale", icon = icon("check"), animation = 'pulse', value = T),
-                               
-                               hr(),
-                               
-                               selectInput('colonne_y', 'Y-Axis', choices = names(planets %>% dplyr::select(which(sapply(.,class) == 'numeric'), -`Planet Name`, -`Right Ascension (sexagesimal)`,
-                                                                                                          -`Declination (sexagesimal)`, -`Planet Hostname`)), 
-                                           selected = "Planet Mass or M*sin(i) [Jupiter mass]"),
-                               
-                               prettyCheckbox(inputId = "Yscale", label = "Logarithmic Scale", icon = icon("check"), animation = 'pulse', value = T),
-                               
-                               hr(),
-                               
-                               materialSwitch(inputId = "smooth1", label = "Linear Smoothing", status = 'primary', value = F),
-                               materialSwitch(inputId = 'smooth2', label = "Lowess Smoothing", status = 'primary'),
-                               
-                               status = 'danger', icon = icon('gear'),
-                               tooltip = tooltipOptions(title = 'Global Options')),
-                             
-                             hr(style = 'border-color:white;'),
-                       fluidRow(verbatimTextOutput("Click_text")),
-                             
-                             plotlyOutput("planet_plot"),  fixed = F, draggable = F, right = 40, left = 'auto', top = 225, width = 500,  tags$head(tags$script(src="clickevent.js"))),uiOutput("modals")),
 
-###################################################################################################################
 
-tabPanel("Sources", icon = icon('copyright')),
+
 tabPanel("Contact",icon = icon("id-badge") , 
          img(src = "washington_state.jpg", height = '750px', width ='1645px',align = 'center', style = 'margin-left:-5px; border:0.5px solid; border-color:white !important;'), 
 

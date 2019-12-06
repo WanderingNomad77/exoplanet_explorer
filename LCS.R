@@ -86,4 +86,66 @@ kepler90_df <- do.call(rbind, lapply(fits, as.data.frame))
 
 savedf <-saveRDS(df, file = 'kepler90.RDS', row.names = F)
 
+planets3 <- planets %>%
+  select(disc = `Year of Discovery`, pl_name = `Planet Name`, method = `Discovery Method`)
+
+gb <- planets3 %>%
+  group_by(disc) %>%
+  summarize(nb = n())
+
+
+
+accumulate_by <- function(dat, var) {
+  var <- lazyeval::f_eval(var, dat)
+  lvls <- plotly:::getLevels(var)
+  dats <- lapply(seq_along(lvls), function(x) {
+    cbind(dat[var %in% lvls[seq(1, x)], ], frame = lvls[[x]])
+  })
+  dplyr::bind_rows(dats)
+}
+
+d <- gb %>%
+  accumulate_by(~disc)
+
+p <- d %>%
+  plot_ly(
+    x = ~disc, 
+    y = ~nb, 
+    frame = ~frame,
+    type = 'scatter', 
+    mode = 'lines',
+    
+    fill = 'tozeroy', 
+    fillcolor='rgba(114, 186, 59, 0.5)',
+    line = list(color = 'rgb(114, 186, 59)'),
+    text = ~paste("Year: ", disc, "<br># of Discoveries:", nb), 
+    hoverinfo = 'text'
+  ) %>%
+  layout(
+    title = "Yearly Evolution of Exoplanet Discoveries ",
+    yaxis = list(
+      title = "Number of Discovered Exoplanets", 
+      range = c(0,1500), 
+      zeroline = T
+    ),
+    xaxis = list(
+      title = "Year", 
+      range = c(1989,2019), 
+      zeroline = F, 
+      showgrid = T
+    )
+  ) %>% 
+  animation_opts(
+    frame = 200, 
+    transition = 0, 
+    redraw = FALSE, mode = 'afterall'
+        
+  ) %>%
+  animation_slider(
+    hide = T
+  )
+
+
+
+
 
